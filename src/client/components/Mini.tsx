@@ -5,8 +5,17 @@ import { Picture } from '../pictures';
 import { Heatmap } from './Heatmap';
 
 /** Small heatmap thumbnail for the result card. */
-export const Mini = ({ prompt, reveal }: { prompt: Prompt; reveal: PromptReveal | undefined }) => (
-  <div className="mini relative aspect-square overflow-hidden rounded-xl" title={prompt.title}>
+export const Mini = ({
+  prompt,
+  reveal,
+}: {
+  prompt: Prompt;
+  reveal: PromptReveal | undefined;
+}) => (
+  <div
+    className="mini relative aspect-square overflow-hidden rounded-xl"
+    title={prompt.title}
+  >
     <div className="picture absolute inset-0 opacity-50">
       <Picture name={prompt.svgComponentName} />
     </div>

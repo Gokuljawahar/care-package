@@ -28,7 +28,8 @@ const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
     data = null;
   }
   if (isError(data)) throw new ApiError(data.message, res.status);
-  if (!res.ok || data === null) throw new ApiError(`HTTP ${res.status}`, res.status);
+  if (!res.ok || data === null)
+    throw new ApiError(`HTTP ${res.status}`, res.status);
   return data;
 };
 
@@ -43,4 +44,5 @@ export const postTap = (body: TapRequest) =>
 
 export const getResult = () => call<ResultResponse>('/api/result');
 
-export const getLeaderboard = () => call<LeaderboardResponse>('/api/leaderboard');
+export const getLeaderboard = () =>
+  call<LeaderboardResponse>('/api/leaderboard');

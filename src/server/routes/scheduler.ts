@@ -7,7 +7,9 @@ export const scheduler = new Hono();
 scheduler.post('/daily-reset', async (c) => {
   try {
     const result = await runDailyReset();
-    console.log(`Daily reset: closed day ${result.closed ?? '-'}, opened day ${result.opened.day} (${result.opened.postId}), ${result.flairs} flairs, comment ${result.commented ? 'posted' : 'skipped'}`);
+    console.log(
+      `Daily reset: closed day ${result.closed ?? '-'}, opened day ${result.opened.day} (${result.opened.postId}), ${result.flairs} flairs, comment ${result.commented ? 'posted' : 'skipped'}`
+    );
     return c.json({ status: 'ok', ...result }, 200);
   } catch (error) {
     console.error('Daily reset failed', error);

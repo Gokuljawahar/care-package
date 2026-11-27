@@ -39,7 +39,19 @@ export const isDayClosed = async (n: number): Promise<boolean> =>
  */
 export const ensureDay = async (): Promise<number> => {
   const current = await getCurrentDay();
-  if (current > 0) return current;
+  if (current > 0) {
+    // A day that has no post yet (playtest bootstrap) is topped up to a full set,
+    // e.g. if it was created while there were fewer prompts per day.
+    const ids = await readIds(current);
+    if (ids.length < PROMPTS_PER_DAY && !(await getDayPostId(current))) {
+      const extra = (await pickPrompts(current)).filter(
+        (id) => !ids.includes(id)
+      );
+      const full = [...ids, ...extra].slice(0, PROMPTS_PER_DAY);
+      await redis.set(keys.dayPrompts(current), full.join(','));
+    }
+    return current;
+  }
   const ids = await pickPrompts(1);
   await redis.set(keys.dayPrompts(1), ids.join(','));
   await redis.set(keys.currentDay(), '1');
@@ -70,7 +82,10 @@ const pickPrompts = async (n: number): Promise<string[]> => {
     [pool[i], pool[j]] = [pool[j] ?? '', pool[i] ?? ''];
   }
   const picked = pool.slice(0, PROMPTS_PER_DAY);
-  await redis.hSet(keys.usedPrompts(), Object.fromEntries(picked.map((id) => [id, String(n)])));
+  await redis.hSet(
+    keys.usedPrompts(),
+    Object.fromEntries(picked.map((id) => [id, String(n)]))
+  );
   return picked;
 };
 
@@ -94,7 +109,9 @@ export const openDay = async (n: number): Promise<Opened> => {
   const post = await reddit.submitCustomPost({
     title: `Thumbprint #${n}: ${first?.title ?? 'Tap where everyone else taps'}`,
     postData: { day: n },
-    textFallback: { text: `Thumbprint #${n}. Tap where you think everyone else will tap.` },
+    textFallback: {
+      text: `Thumbprint #${n}. Tap where you think everyone else will tap.`,
+    },
   });
   await redis.set(keys.dayPost(n), post.id);
   await redis.set(keys.currentDay(), String(n));
@@ -163,7 +180,8 @@ export type ResetResult = {
 export const runDailyReset = async (): Promise<ResetResult> => {
   const lock = await redis.incrBy(keys.resetLock(), 1);
   await redis.expire(keys.resetLock(), 120);
-  if (lock !== 1) throw new Error('A reset is already running. Try again in a minute.');
+  if (lock !== 1)
+    throw new Error('A reset is already running. Try again in a minute.');
 
   try {
     const n = await getCurrentDay();

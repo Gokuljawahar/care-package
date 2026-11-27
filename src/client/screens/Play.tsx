@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent,
+} from 'react';
 import { GRID, MIN_CROWD } from '../../shared/game';
 import type { PromptReveal } from '../../shared/api';
 import type { Prompt } from '../../shared/prompts';
@@ -31,10 +37,20 @@ const reducedMotion = () =>
   typeof window !== 'undefined' &&
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLabel }: Props) => {
+export const Play = ({
+  prompt,
+  index,
+  count,
+  existing,
+  onReveal,
+  onNext,
+  nextLabel,
+}: Props) => {
   const { ref, size } = useSquare<HTMLDivElement>();
   const [tap, setTap] = useState<{ x: number; y: number } | null>(
-    existing ? { x: (existing.cx + 0.5) / GRID, y: (existing.cy + 0.5) / GRID } : null
+    existing
+      ? { x: (existing.cx + 0.5) / GRID, y: (existing.cy + 0.5) / GRID }
+      : null
   );
   const [reveal, setReveal] = useState<PromptReveal | null>(existing);
   const [bloomed, setBloomed] = useState(Boolean(existing));
@@ -50,6 +66,14 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
     if (!reveal || replay) return;
     const quick = reducedMotion();
     const raf = requestAnimationFrame(() => setBloomed(true));
+    // Light haptic when you land in the hottest spot (where the device allows it).
+    if (reveal.hottest && !quick) {
+      try {
+        navigator.vibrate?.(25);
+      } catch {
+        // Not available in this webview.
+      }
+    }
     const t = window.setTimeout(() => setShowNext(true), quick ? 0 : BLOOM_MS);
     return () => {
       cancelAnimationFrame(raf);
@@ -80,9 +104,16 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
   return (
     <div className="flex h-full flex-col px-4 pt-3 pb-3">
       <div className="flex items-center justify-between">
-        <div className="flex gap-1.5" aria-label={`Prompt ${index + 1} of ${count}`}>
+        <div
+          className="flex gap-1.5"
+          aria-label={`Prompt ${index + 1} of ${count}`}
+        >
           {Array.from({ length: count }, (_, i) => (
-            <span key={i} className="dot" data-state={i < index ? 'done' : i === index ? 'now' : 'todo'} />
+            <span
+              key={i}
+              className="dot"
+              data-state={i < index ? 'done' : i === index ? 'now' : 'todo'}
+            />
           ))}
         </div>
         <span className="text-xs font-semibold text-muted">
@@ -94,7 +125,10 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
         {prompt.title}
       </h2>
 
-      <div ref={ref} className="mt-2 flex min-h-0 flex-1 items-center justify-center">
+      <div
+        ref={ref}
+        className="mt-2 flex min-h-0 flex-1 items-center justify-center"
+      >
         <div
           className="stage relative overflow-hidden rounded-2xl"
           style={{ width: size, height: size }}
@@ -116,7 +150,9 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
               <Heatmap cells={reveal.grid} />
             </div>
           )}
-          {tap && <Thumb x={tap.x} y={tap.y} pulse={Boolean(reveal) && !replay} />}
+          {tap && (
+            <Thumb x={tap.x} y={tap.y} pulse={Boolean(reveal) && !replay} />
+          )}
         </div>
       </div>
 
@@ -127,7 +163,9 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
           <div className="flex w-full items-center gap-3">
             <div className="min-w-0 flex-1 leading-tight">
               <p className="font-display text-lg font-semibold text-ink">
-                {reveal.hottest ? 'Bang on the hotspot' : `${reveal.score}% crowd match`}
+                {reveal.hottest
+                  ? 'Bang on the hotspot'
+                  : `${reveal.score}% crowd match`}
               </p>
               <p className="text-[11px] leading-snug text-muted">
                 {reveal.total < MIN_CROWD
@@ -140,7 +178,9 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
             </button>
           </div>
         ) : (
-          <p className="text-sm text-muted">{tap ? 'Reading the crowd…' : 'One tap. Think crowd.'}</p>
+          <p className="text-sm text-muted">
+            {tap ? 'Reading the crowd…' : 'One tap. Think crowd.'}
+          </p>
         )}
       </div>
     </div>

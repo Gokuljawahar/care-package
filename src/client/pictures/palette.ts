@@ -16,4 +16,5 @@ export const C = {
   white: '#fff8ee',
 } as const;
 
-export const FONT = "'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif";
+export const FONT =
+  "'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif";

@@ -2,6 +2,7 @@ import { navigateTo, showToast } from '@devvit/web/client';
 import type { ResultResponse } from '../../shared/api';
 import type { Prompt } from '../../shared/prompts';
 import { Mini } from '../components/Mini';
+import { useCountUp } from '../hooks/useCountUp';
 import { useCountdown } from '../hooks/useCountdown';
 
 const square = (score: number) =>
@@ -14,6 +15,7 @@ type Props = { result: ResultResponse; prompts: Prompt[] };
 
 export const Result = ({ result, prompts }: Props) => {
   const countdown = useCountdown(result.nextResetAt);
+  const shown = useCountUp(result.npc);
 
   const toComments = async () => {
     try {
@@ -33,14 +35,25 @@ export const Result = ({ result, prompts }: Props) => {
       </div>
 
       <div className="mt-2 flex flex-col items-center">
-        <p className="npc-number font-display leading-none font-bold">{result.npc}%</p>
-        <p className="mt-1 text-xs tracking-widest text-muted uppercase">NPC score</p>
+        <p
+          className="npc-number font-display leading-none font-bold"
+          aria-label={`${result.npc}% NPC`}
+        >
+          {shown}%
+        </p>
+        <p className="mt-1 text-xs tracking-widest text-muted uppercase">
+          NPC score
+        </p>
         <p className="label-pill mt-2">{result.label}</p>
       </div>
 
-      <div className="mt-4 grid w-full max-w-[340px] grid-cols-5 gap-2">
+      <div className="mt-4 grid w-full max-w-[360px] grid-cols-5 gap-2">
         {prompts.map((p) => (
-          <Mini key={p.id} prompt={p} reveal={result.reveals.find((r) => r.promptId === p.id)} />
+          <Mini
+            key={p.id}
+            prompt={p}
+            reveal={result.reveals.find((r) => r.promptId === p.id)}
+          />
         ))}
       </div>
 
@@ -52,12 +65,17 @@ export const Result = ({ result, prompts }: Props) => {
       </div>
 
       <div className="mt-auto flex w-full max-w-[340px] flex-col items-center gap-2">
-        <button className="btn btn-primary w-full" onClick={() => void toComments()}>
+        <button
+          className="btn btn-primary w-full"
+          onClick={() => void toComments()}
+        >
           Flex it in the comments
         </button>
         <button
           className="min-h-[44px] px-4 text-sm font-semibold text-muted underline-offset-4 hover:underline"
-          onClick={() => navigateTo(`https://www.reddit.com/r/${result.subredditName}/`)}
+          onClick={() =>
+            navigateTo(`https://www.reddit.com/r/${result.subredditName}/`)
+          }
         >
           Join r/{result.subredditName}
         </button>

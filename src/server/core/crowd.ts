@@ -12,7 +12,10 @@ import {
 import type { PromptReveal } from '../../shared/api';
 import { keys } from './keys';
 
-export const readGrid = async (day: number, promptId: string): Promise<GridMap> =>
+export const readGrid = async (
+  day: number,
+  promptId: string
+): Promise<GridMap> =>
   gridFromHash(await redis.hGetAll(keys.grid(day, promptId)));
 
 export const readUserCell = async (

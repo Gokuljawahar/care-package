@@ -68,7 +68,13 @@ const drawHeat = (canvas: HTMLCanvasElement, cells: GridCell[]) => {
   ctx.putImageData(img, 0, 0);
 };
 
-export const Heatmap = ({ cells, className }: { cells: GridCell[]; className?: string }) => {
+export const Heatmap = ({
+  cells,
+  className,
+}: {
+  cells: GridCell[];
+  className?: string;
+}) => {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     if (ref.current) drawHeat(ref.current, cells);

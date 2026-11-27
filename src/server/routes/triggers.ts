@@ -9,15 +9,24 @@ triggers.post('/on-app-install', async (c) => {
   try {
     const input = await c.req.json<OnAppInstallRequest>();
     if ((await getCurrentDay()) > 0) {
-      return c.json<TriggerResponse>({ status: 'success', message: 'Already set up' }, 200);
+      return c.json<TriggerResponse>(
+        { status: 'success', message: 'Already set up' },
+        200
+      );
     }
     const { opened } = await runDailyReset();
     return c.json<TriggerResponse>(
-      { status: 'success', message: `Created Thumbprint #${opened.day} (${opened.postId}) on ${input.type}` },
+      {
+        status: 'success',
+        message: `Created Thumbprint #${opened.day} (${opened.postId}) on ${input.type}`,
+      },
       200
     );
   } catch (error) {
     console.error('Install setup failed', error);
-    return c.json<TriggerResponse>({ status: 'error', message: 'Failed to create the first post' }, 400);
+    return c.json<TriggerResponse>(
+      { status: 'error', message: 'Failed to create the first post' },
+      400
+    );
   }
 });

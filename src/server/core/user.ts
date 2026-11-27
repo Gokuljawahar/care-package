@@ -1,7 +1,11 @@
 import { redis } from '@devvit/web/server';
 import { keys } from './keys';
 
-export type Streak = { streak: number; bestStreak: number; lastDayPlayed: number };
+export type Streak = {
+  streak: number;
+  bestStreak: number;
+  lastDayPlayed: number;
+};
 
 const num = (v: string | undefined) => {
   const n = v ? parseInt(v, 10) : 0;
@@ -22,7 +26,10 @@ export const liveStreak = (u: Streak, currentDay: number): number =>
   u.lastDayPlayed >= currentDay - 1 ? u.streak : 0;
 
 /** Called once when a player finishes all prompts of `day`. Idempotent. */
-export const recordFinish = async (userId: string, day: number): Promise<Streak> => {
+export const recordFinish = async (
+  userId: string,
+  day: number
+): Promise<Streak> => {
   const u = await readUser(userId);
   if (u.lastDayPlayed >= day) return u;
   const streak = u.lastDayPlayed === day - 1 ? u.streak + 1 : 1;

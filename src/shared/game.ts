@@ -49,7 +49,11 @@ export const totalTaps = (grid: GridMap): number =>
   Object.values(grid).reduce((a, b) => a + b, 0);
 
 /** Taps in the (2*RADIUS+1)^2 neighbourhood around (cx, cy). */
-export const neighbourhood = (grid: GridMap, cx: number, cy: number): number => {
+export const neighbourhood = (
+  grid: GridMap,
+  cx: number,
+  cy: number
+): number => {
   let sum = 0;
   for (let dx = -RADIUS; dx <= RADIUS; dx++) {
     for (let dy = -RADIUS; dy <= RADIUS; dy++) {

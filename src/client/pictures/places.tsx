@@ -27,10 +27,31 @@ export const CarPark = () => (
     ))}
     <rect x="94.5" y="6" width="0.9" height="36" fill={C.cream} />
     <rect x="94.5" y="58" width="0.9" height="36" fill={C.cream} />
-    {[[1, 0, C.clay], [3, 0, C.teal], [0, 1, C.mustard], [4, 1, C.sky]].map(([col, row, fill]) => (
-      <rect key={`${col}-${row}`} x={7 + Number(col) * 16} y={row ? 62 : 10} width="10" height="28" rx="3" fill={String(fill)} />
+    {[
+      [1, 0, C.clay],
+      [3, 0, C.teal],
+      [0, 1, C.mustard],
+      [4, 1, C.sky],
+    ].map(([col, row, fill]) => (
+      <rect
+        key={`${col}-${row}`}
+        x={7 + Number(col) * 16}
+        y={row ? 62 : 10}
+        width="10"
+        height="28"
+        rx="3"
+        fill={String(fill)}
+      />
     ))}
-    <text x="50" y="52.5" textAnchor="middle" fontSize="4.5" fontFamily={FONT} fontWeight="700" fill={C.mustard}>
+    <text
+      x="50"
+      y="52.5"
+      textAnchor="middle"
+      fontSize="4.5"
+      fontFamily={FONT}
+      fontWeight="700"
+      fill={C.mustard}
+    >
       ← EXIT
     </text>
   </svg>
@@ -44,13 +65,30 @@ export const Bus = () => (
     <rect x="28" y="10" width="10" height="8" rx="2" fill={C.ink2} />
     {range(8).map((r) =>
       [0, 1, 3, 4].map((c) => (
-        <rect key={`${r}-${c}`} x={29 + c * 9} y={24 + r * 8.4} width="7" height="6.4" rx="1.6" fill={C.clay} />
+        <rect
+          key={`${r}-${c}`}
+          x={29 + c * 9}
+          y={24 + r * 8.4}
+          width="7"
+          height="6.4"
+          rx="1.6"
+          fill={C.clay}
+        />
       ))
     )}
   </svg>
 );
 
-const BOOKS = [C.clay, C.teal, C.mustard, C.plum, C.sea, C.rose, C.leaf, C.rust];
+const BOOKS = [
+  C.clay,
+  C.teal,
+  C.mustard,
+  C.plum,
+  C.sea,
+  C.rose,
+  C.leaf,
+  C.rust,
+];
 
 export const Bookshelf = () => (
   <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -76,7 +114,9 @@ export const Bookshelf = () => (
                 height={h}
                 rx="1"
                 fill={BOOKS[(i + shelf * 3) % BOOKS.length]}
-                transform={lean ? `rotate(14 ${bx} ${30 + shelf * 30})` : undefined}
+                transform={
+                  lean ? `rotate(14 ${bx} ${30 + shelf * 30})` : undefined
+                }
               />
             );
           })}
@@ -93,7 +133,14 @@ export const Fridge = () => (
     <rect x="24" y="36" width="52" height="2" fill={C.sand} />
     <rect x="68" y="16" width="3" height="14" rx="1.5" fill={C.sand} />
     <rect x="68" y="44" width="3" height="20" rx="1.5" fill={C.sand} />
-    <rect x="34" y="50" width="16" height="12" fill={C.white} transform="rotate(-6 42 56)" />
+    <rect
+      x="34"
+      y="50"
+      width="16"
+      height="12"
+      fill={C.white}
+      transform="rotate(-6 42 56)"
+    />
     <circle cx="42" cy="50" r="1.8" fill={C.clay} />
   </svg>
 );
@@ -106,7 +153,15 @@ export const Doors = () => (
       <g key={fill}>
         <rect x={8 + i * 30} y="28" width="24" height="56" rx="2" fill={fill} />
         <circle cx={27 + i * 30} cy="58" r="1.8" fill={C.ink} />
-        <text x={20 + i * 30} y="22" textAnchor="middle" fontSize="8" fontFamily={FONT} fontWeight="700" fill={C.cream}>
+        <text
+          x={20 + i * 30}
+          y="22"
+          textAnchor="middle"
+          fontSize="8"
+          fontFamily={FONT}
+          fontWeight="700"
+          fill={C.cream}
+        >
           {i + 1}
         </text>
       </g>
@@ -123,11 +178,25 @@ export const Checkout = () => (
       return (
         <g key={lane}>
           <rect x={x} y="8" width="12" height="18" rx="2" fill={C.ink2} />
-          <text x={x + 6} y="19" textAnchor="middle" fontSize="6" fontFamily={FONT} fontWeight="700" fill={C.mustard}>
+          <text
+            x={x + 6}
+            y="19"
+            textAnchor="middle"
+            fontSize="6"
+            fontFamily={FONT}
+            fontWeight="700"
+            fill={C.mustard}
+          >
             {lane + 1}
           </text>
           {range(queue).map((q) => (
-            <circle key={q} cx={x + 6} cy={36 + q * 13} r="4.6" fill={[C.clay, C.teal, C.plum, C.sea][q % 4]} />
+            <circle
+              key={q}
+              cx={x + 6}
+              cy={36 + q * 13}
+              r="4.6"
+              fill={[C.clay, C.teal, C.plum, C.sea][q % 4]}
+            />
           ))}
         </g>
       );
@@ -164,8 +233,20 @@ export const Stairs = () => (
     <rect width="100" height="100" fill={C.sky} />
     {range(7).map((i) => (
       <g key={i}>
-        <rect x={6 + i * 12.5} y={86 - i * 11} width={94 - i * 12.5} height="11" fill={i % 2 ? C.clay : C.rust} />
-        <rect x={6 + i * 12.5} y={86 - i * 11} width={94 - i * 12.5} height="2" fill={C.cream} />
+        <rect
+          x={6 + i * 12.5}
+          y={86 - i * 11}
+          width={94 - i * 12.5}
+          height="11"
+          fill={i % 2 ? C.clay : C.rust}
+        />
+        <rect
+          x={6 + i * 12.5}
+          y={86 - i * 11}
+          width={94 - i * 12.5}
+          height="2"
+          fill={C.cream}
+        />
       </g>
     ))}
   </svg>
@@ -177,11 +258,28 @@ export const Pool = () => (
     <rect x="8" y="8" width="84" height="84" rx="4" fill={C.sky} />
     {range(5).map((i) => (
       <g key={i}>
-        <line x1={8 + (i + 1) * 14} y1="12" x2={8 + (i + 1) * 14} y2="88" stroke={C.white} strokeWidth="1" strokeDasharray="3 2" />
+        <line
+          x1={8 + (i + 1) * 14}
+          y1="12"
+          x2={8 + (i + 1) * 14}
+          y2="88"
+          stroke={C.white}
+          strokeWidth="1"
+          strokeDasharray="3 2"
+        />
       </g>
     ))}
     {range(6).map((i) => (
-      <text key={i} x={15 + i * 14} y="96" textAnchor="middle" fontSize="4.5" fontFamily={FONT} fontWeight="700" fill={C.ink}>
+      <text
+        key={i}
+        x={15 + i * 14}
+        y="96"
+        textAnchor="middle"
+        fontSize="4.5"
+        fontFamily={FONT}
+        fontWeight="700"
+        fill={C.ink}
+      >
         {i + 1}
       </text>
     ))}
@@ -198,10 +296,39 @@ export const Lockers = () => (
       const y = 6 + Math.floor(i / 5) * 22.5;
       return (
         <g key={i}>
-          <rect x={x} y={y} width="16" height="20.5" rx="1.6" fill={i % 7 === 3 ? C.clay : C.sea} />
-          <rect x={x + 3} y={y + 3} width="10" height="1.2" fill={C.ink} opacity="0.5" />
-          <rect x={x + 3} y={y + 5.5} width="10" height="1.2" fill={C.ink} opacity="0.5" />
-          <text x={x + 8} y={y + 15} textAnchor="middle" fontSize="5" fontFamily={FONT} fontWeight="700" fill={C.cream}>
+          <rect
+            x={x}
+            y={y}
+            width="16"
+            height="20.5"
+            rx="1.6"
+            fill={i % 7 === 3 ? C.clay : C.sea}
+          />
+          <rect
+            x={x + 3}
+            y={y + 3}
+            width="10"
+            height="1.2"
+            fill={C.ink}
+            opacity="0.5"
+          />
+          <rect
+            x={x + 3}
+            y={y + 5.5}
+            width="10"
+            height="1.2"
+            fill={C.ink}
+            opacity="0.5"
+          />
+          <text
+            x={x + 8}
+            y={y + 15}
+            textAnchor="middle"
+            fontSize="5"
+            fontFamily={FONT}
+            fontWeight="700"
+            fill={C.cream}
+          >
             {i + 1}
           </text>
         </g>
@@ -213,7 +340,15 @@ export const Lockers = () => (
 export const FloorPlan = () => (
   <svg viewBox="0 0 100 100" aria-hidden="true">
     <rect width="100" height="100" fill={C.sand} />
-    <rect x="6" y="6" width="88" height="88" fill={C.cream} stroke={C.ink} strokeWidth="2.4" />
+    <rect
+      x="6"
+      y="6"
+      width="88"
+      height="88"
+      fill={C.cream}
+      stroke={C.ink}
+      strokeWidth="2.4"
+    />
     <line x1="54" y1="6" x2="54" y2="58" stroke={C.ink} strokeWidth="2.4" />
     <line x1="6" y1="58" x2="40" y2="58" stroke={C.ink} strokeWidth="2.4" />
     <rect x="10" y="10" width="26" height="34" rx="2" fill={C.teal} />

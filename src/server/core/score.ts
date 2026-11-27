@@ -39,5 +39,8 @@ export const topPercent = async (
   if (!players || rank === undefined) return { topPercent: 100, players };
   // zRank is ascending: the best score has rank players-1.
   const fromTop = players - rank;
-  return { topPercent: Math.max(1, Math.ceil((fromTop / players) * 100)), players };
+  return {
+    topPercent: Math.max(1, Math.ceil((fromTop / players) * 100)),
+    players,
+  };
 };

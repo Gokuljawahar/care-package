@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import type { PromptReveal, ResultResponse, TodayResponse } from '../shared/api';
+import type {
+  PromptReveal,
+  ResultResponse,
+  TodayResponse,
+} from '../shared/api';
 import { getResult, getToday } from './api';
 import { Leaderboard } from './screens/Leaderboard';
 import { Play } from './screens/Play';
@@ -9,7 +13,9 @@ import { Start } from './screens/Start';
 type Screen = 'start' | 'play' | 'result' | 'leaderboard';
 
 const firstOpenIndex = (t: TodayResponse) => {
-  const i = t.prompts.findIndex((p) => !t.reveals.some((r) => r.promptId === p.id));
+  const i = t.prompts.findIndex(
+    (p) => !t.reveals.some((r) => r.promptId === p.id)
+  );
   return i === -1 ? t.prompts.length : i;
 };
 
@@ -24,7 +30,9 @@ export const App = () => {
     setScreen('result');
     getResult()
       .then(setResult)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load result'));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : 'Could not load result')
+      );
   }, []);
 
   useEffect(() => {
@@ -36,45 +44,68 @@ export const App = () => {
         // Already finished today: straight to the result card.
         if (t.prompts.length > 0 && i === t.prompts.length) loadResult();
       })
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load'));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : 'Could not load')
+      );
   }, [loadResult]);
 
   const addReveal = (reveal: PromptReveal) =>
     setToday((t) => (t ? { ...t, reveals: [...t.reveals, reveal] } : t));
 
-  if (error) return <Shell><p className="font-semibold text-pink">{error}</p></Shell>;
-  if (!today) return <Shell><p className="text-muted">Loading…</p></Shell>;
+  if (error)
+    return (
+      <Shell>
+        <p className="font-semibold text-pink">{error}</p>
+      </Shell>
+    );
+  if (!today)
+    return (
+      <Shell>
+        <span className="loading-dot" aria-label="Loading" />
+      </Shell>
+    );
 
   if (screen === 'start') {
     return (
-      <main className="app">
-        <Start today={today} onPlay={() => setScreen('play')} onLeaderboard={() => setScreen('leaderboard')} />
+      <main className="app enter">
+        <Start
+          today={today}
+          onPlay={() => setScreen('play')}
+          onLeaderboard={() => setScreen('leaderboard')}
+        />
       </main>
     );
   }
   if (screen === 'leaderboard') {
     return (
-      <main className="app">
+      <main className="app enter">
         <Leaderboard onBack={() => setScreen('start')} />
       </main>
     );
   }
   if (screen === 'result') {
     return result ? (
-      <main className="app">
+      <main className="app enter">
         <Result result={result} prompts={today.prompts} />
       </main>
     ) : (
-      <Shell><p className="text-muted">Counting the crowd…</p></Shell>
+      <Shell>
+        <p className="text-muted">Counting the crowd…</p>
+      </Shell>
     );
   }
 
   const prompt = today.prompts[index];
-  if (!prompt) return <Shell><p className="text-muted">No prompts today.</p></Shell>;
+  if (!prompt)
+    return (
+      <Shell>
+        <p className="text-muted">No prompts today.</p>
+      </Shell>
+    );
   const isLast = index === today.prompts.length - 1;
 
   return (
-    <main className="app">
+    <main className="app enter">
       <Play
         key={prompt.id}
         prompt={prompt}
@@ -90,5 +121,7 @@ export const App = () => {
 };
 
 const Shell = ({ children }: { children: ReactNode }) => (
-  <main className="app flex items-center justify-center p-6 text-center">{children}</main>
+  <main className="app flex items-center justify-center p-6 text-center">
+    {children}
+  </main>
 );

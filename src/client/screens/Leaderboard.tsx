@@ -12,7 +12,9 @@ export const Leaderboard = ({ onBack }: { onBack: () => void }) => {
   useEffect(() => {
     getLeaderboard()
       .then(setData)
-      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load'));
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : 'Could not load')
+      );
   }, []);
 
   const rows: LeaderboardEntry[] = data ? data[tab] : [];
@@ -23,7 +25,14 @@ export const Leaderboard = ({ onBack }: { onBack: () => void }) => {
       <div className="flex items-center gap-2">
         <button className="icon-btn" onClick={onBack} aria-label="Back">
           <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
-            <path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+            <path
+              d="M15 5l-7 7 7 7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <h2 className="font-display text-2xl font-bold">Leaderboard</h2>
@@ -31,7 +40,13 @@ export const Leaderboard = ({ onBack }: { onBack: () => void }) => {
 
       <div className="tabs mt-3" role="tablist">
         {(['today', 'streaks'] as const).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className="tab" onClick={() => setTab(t)}>
+          <button
+            key={t}
+            role="tab"
+            aria-selected={tab === t}
+            className="tab"
+            onClick={() => setTab(t)}
+          >
             {t === 'today' ? 'Most NPC today' : 'Best streaks'}
           </button>
         ))}
@@ -39,9 +54,13 @@ export const Leaderboard = ({ onBack }: { onBack: () => void }) => {
 
       <ol className="mt-2 min-h-0 flex-1">
         {error && <li className="p-4 text-center text-pink">{error}</li>}
-        {!error && !data && <li className="p-4 text-center text-muted">Loading…</li>}
+        {!error && !data && (
+          <li className="p-4 text-center text-muted">Loading…</li>
+        )}
         {data && rows.length === 0 && (
-          <li className="p-4 text-center text-muted">Nobody yet. Be the first.</li>
+          <li className="p-4 text-center text-muted">
+            Nobody yet. Be the first.
+          </li>
         )}
         {rows.map((r, i) => (
           <li key={r.username} className="lb-row">

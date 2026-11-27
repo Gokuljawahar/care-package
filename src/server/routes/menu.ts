@@ -18,7 +18,8 @@ menu.post('/create-today', async (c) => {
     );
   } catch (error) {
     console.error('Create today failed', error);
-    const message = error instanceof Error ? error.message : 'Failed to create the post';
+    const message =
+      error instanceof Error ? error.message : 'Failed to create the post';
     return c.json<UiResponse>({ showToast: message }, 200);
   }
 });

@@ -38,18 +38,28 @@ export const setStreakFlair = async (final: DayFinal): Promise<number> => {
     const username = names.get(id);
     if (!username) continue;
     const { streak } = await readUser(id);
-    if (streak > 0) flairs.push({ username, text: `Thumbprint · ${streak}-day streak` });
+    if (streak > 0)
+      flairs.push({ username, text: `Thumbprint · ${streak}-day streak` });
   }
   for (let i = 0; i < flairs.length; i += 100) {
-    await reddit.setUserFlairBatch(context.subredditName, flairs.slice(i, i + 100));
+    await reddit.setUserFlairBatch(
+      context.subredditName,
+      flairs.slice(i, i + 100)
+    );
   }
   return flairs.length;
 };
 
-export const summaryMarkdown = (final: DayFinal, names: Map<string, string>, next: Opened): string => {
+export const summaryMarkdown = (
+  final: DayFinal,
+  names: Map<string, string>,
+  next: Opened
+): string => {
   const scores = [...final.npc.values()];
   const players = scores.length;
-  const avg = players ? Math.round(scores.reduce((a, b) => a + b, 0) / players) : 0;
+  const avg = players
+    ? Math.round(scores.reduce((a, b) => a + b, 0) / players)
+    : 0;
 
   const rows = final.prompts.map((p) => {
     const grid = final.grids[p.id] ?? {};
@@ -79,7 +89,10 @@ export const summaryMarkdown = (final: DayFinal, names: Map<string, string>, nex
 };
 
 /** Pinned-style summary comment on the closed day's post. */
-export const postSummary = async (final: DayFinal, next: Opened): Promise<void> => {
+export const postSummary = async (
+  final: DayFinal,
+  next: Opened
+): Promise<void> => {
   const postId = final.postId;
   if (!isT3(postId)) return;
   const top = [...final.npc].sort((a, b) => b[1] - a[1])[0];
