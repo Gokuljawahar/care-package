@@ -16,8 +16,9 @@ import {
   toBunkerState,
   updatePlayerAtomic,
 } from './bunker';
-import { getDayLaw } from './day';
+import { getCurrentDay } from './day';
 import { keys } from './keys';
+import { resolveDayLaw } from './warden';
 
 export type ExecuteScavengeResult =
   | {
@@ -45,7 +46,8 @@ export const executeScavenge = async (
 
   let committed = false;
   try {
-    const law = await getDayLaw(day);
+    const currentDay = await getCurrentDay();
+    const law = await resolveDayLaw(day, currentDay || day);
     const rolled = rollScavenge(site, law);
 
     const updated = await updatePlayerAtomic(userId, day, (record) => {

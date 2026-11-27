@@ -6,25 +6,19 @@ import type {
 import {
   CLAIMS,
   isClaimId,
-  isClaimTrue,
   isNpcId,
   samplePlayerBroadcasts,
-  TRUST_LB_MIN_EVENTS,
   trustPercent,
   type ClaimId,
   type DisasterId,
   type LawId,
   type PlayerBroadcastCandidate,
 } from '../../shared/game';
-import {
-  ensureBunker,
-  readChecklist,
-  recordDailyAction,
-  updatePlayerAtomic,
-} from './bunker';
-import { getDayDisaster, getDayLaw } from './day';
+import { ensureBunker, readChecklist, recordDailyAction } from './bunker';
+import { getCurrentDay, getDayDisaster } from './day';
 import { keys } from './keys';
 import { readNpcBroadcasts, readOfficialSignal } from './npcs';
+import { resolveDayLaw } from './warden';
 
 const num = (v: string | undefined): number => {
   if (v === undefined) return 0;
@@ -155,9 +149,10 @@ export const submitBroadcast = async (
     ]);
     committed = true;
 
+    const currentDay = await getCurrentDay();
     const [disaster, law, checklistData] = await Promise.all([
       getDayDisaster(day),
-      getDayLaw(day),
+      resolveDayLaw(day, currentDay || day),
       readChecklist(day, userId),
     ]);
     const radioFeed = await readRadioFeed(
@@ -180,73 +175,4 @@ export const submitBroadcast = async (
     }
     throw error;
   }
-};
-
-export type BroadcastScoringSummary = {
-  scoredCount: number;
-  trueCount: number;
-  falseCount: number;
-};
-
-/**
- * Evaluates all real player broadcasts at midnight close once (idempotent).
- */
-export const scoreDayBroadcasts = async (
-  day: number,
-  disaster: DisasterId
-): Promise<BroadcastScoringSummary> => {
-  const first = await redis.incrBy(keys.dayBroadcastsScored(day), 1);
-  if (first !== 1) return { scoredCount: 0, trueCount: 0, falseCount: 0 };
-
-  const rawBroadcasts = await redis.hGetAll(keys.dayBroadcasts(day));
-  let scoredCount = 0;
-  let trueCount = 0;
-  let falseCount = 0;
-
-  const resultsHash: Record<string, string> = {};
-  const liarsHash: Record<string, string> = {};
-
-  for (const [userId, rawClaim] of Object.entries(rawBroadcasts)) {
-    if (isNpcId(userId) || !isClaimId(rawClaim)) continue;
-    const truth = isClaimTrue(rawClaim, disaster);
-    scoredCount += 1;
-    if (truth) trueCount += 1;
-    else {
-      falseCount += 1;
-      liarsHash[userId] = rawClaim;
-    }
-    resultsHash[userId] = truth ? '1' : '0';
-
-    const trustResult = await updatePlayerAtomic(userId, day, (record) => {
-      const nextGood = record.trustGood + (truth ? 1 : 0);
-      const nextTotal = record.trustTotal + 1;
-      return {
-        commit: true,
-        fields: {
-          trustGood: String(nextGood),
-          trustTotal: String(nextTotal),
-        },
-        result: {
-          total: nextTotal,
-          trust: trustPercent(nextGood, nextTotal),
-        },
-      };
-    });
-
-    if (trustResult.total >= TRUST_LB_MIN_EVENTS) {
-      await redis.zAdd(keys.lbTrust(), {
-        member: userId,
-        score: trustResult.trust,
-      });
-    }
-  }
-
-  if (Object.keys(resultsHash).length > 0) {
-    await redis.hSet(keys.dayBroadcastResults(day), resultsHash);
-  }
-  if (Object.keys(liarsHash).length > 0) {
-    await redis.hSet(keys.dayLiars(day), liarsHash);
-  }
-
-  return { scoredCount, trueCount, falseCount };
 };

@@ -5,6 +5,7 @@ import {
   isClaimId,
   isCrateKind,
   isCrateResource,
+  isLawId,
   isScavengeSiteId,
   nextResetAt,
   trustPercent,
@@ -17,13 +18,22 @@ import type {
   LeaderboardResponse,
   ScavengeResponse,
   WardenBanner,
+  WardenLawResponse,
 } from '../../shared/api';
 import {
+  applyLazyCatchUp,
   emptyChecklist,
   ensureBunker,
   readChecklist,
   toBunkerState,
 } from '../core/bunker';
+import {
+  ensureDay,
+  getDayDisaster,
+  getDayPostId,
+  isDayClosed,
+} from '../core/day';
+import { keys } from '../core/keys';
 import {
   burnCrate,
   openCrate,
@@ -33,20 +43,17 @@ import {
   sendCrate,
 } from '../core/crates';
 import {
-  ensureDay,
-  getDayDisaster,
-  getDayLaw,
-  getDayPostId,
-  getDayWarden,
-  isDayClosed,
-} from '../core/day';
-import { keys } from '../core/keys';
-import {
   readMyBroadcast,
   readRadioFeed,
   submitBroadcast,
 } from '../core/radio';
 import { executeScavenge } from '../core/scavenge';
+import {
+  decreeLaw,
+  getDayLawOptions,
+  getDayWarden,
+  resolveDayLaw,
+} from '../core/warden';
 
 export const api = new Hono();
 
@@ -149,12 +156,25 @@ api.get('/state', async (c) => {
     const { userId, username } = context;
     const disaster = (await getDayDisaster(day)) ?? 'blackout';
 
+    let awayNotice: string | null = null;
+    let bunkerRecord = userId
+      ? await ensureBunker(userId, username, current)
+      : null;
+
+    if (userId && current > 1 && (await isDayClosed(current - 1))) {
+      awayNotice = await applyLazyCatchUp(userId, current - 1);
+      if (awayNotice) {
+        bunkerRecord = await ensureBunker(userId, username, current);
+      }
+    }
+
     const [
       closed,
       warden,
+      wardenId,
       law,
+      lawOptions,
       todayPostId,
-      bunkerRecord,
       checklistData,
       crates,
       lastSent,
@@ -162,9 +182,10 @@ api.get('/state', async (c) => {
     ] = await Promise.all([
       isDayClosed(day),
       loadWardenBanner(day),
-      getDayLaw(day),
+      getDayWarden(day),
+      resolveDayLaw(day, current),
+      getDayLawOptions(day),
       day !== current ? getDayPostId(current) : Promise.resolve(undefined),
-      userId ? ensureBunker(userId, username, current) : Promise.resolve(null),
       userId
         ? readChecklist(day, userId)
         : Promise.resolve({
@@ -182,6 +203,7 @@ api.get('/state', async (c) => {
       disaster,
       law
     );
+    const isWarden = Boolean(userId && wardenId && wardenId === userId);
 
     return c.json<AppStateResponse>({
       type: 'state',
@@ -205,6 +227,9 @@ api.get('/state', async (c) => {
       lastSent,
       radioFeed,
       myBroadcast,
+      isWarden,
+      wardenLawOptions: isWarden && !law && !closed ? lawOptions : [],
+      awayNotice,
     });
   } catch (error) {
     console.error('GET /api/state failed', error);
@@ -364,6 +389,39 @@ api.post('/radio/broadcast', async (c) => {
   } catch (error) {
     console.error('POST /api/radio/broadcast failed', error);
     return c.json(fail('Could not send broadcast'), 500);
+  }
+});
+
+api.post('/warden/law', async (c) => {
+  const { userId } = context;
+  if (!userId) return c.json(fail('Log in first'), 401);
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json(fail('Bad request'), 400);
+  }
+  if (
+    typeof rawBody !== 'object' ||
+    rawBody === null ||
+    !('lawId' in rawBody) ||
+    !isLawId(rawBody.lawId)
+  ) {
+    return c.json(fail('Choose a valid law'), 400);
+  }
+
+  try {
+    const day = await resolveDay();
+    if (await isDayClosed(day)) return c.json(fail('This day is closed'), 409);
+
+    const res = await decreeLaw(userId, day, rawBody.lawId);
+    if (!res.ok) return c.json(fail(res.message), res.status);
+
+    return c.json<WardenLawResponse>({ type: 'warden_law', law: res.law });
+  } catch (error) {
+    console.error('POST /api/warden/law failed', error);
+    return c.json(fail('Could not enact law'), 500);
   }
 });
 

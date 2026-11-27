@@ -61,7 +61,10 @@ export const seedNewPlayerNpcCrates = async (
         scanned: '0',
         scanResult: '',
       });
-      await redis.zAdd(keys.doorstep(userId), { member: crateId, score: day });
+      await Promise.all([
+        redis.zAdd(keys.doorstep(userId), { member: crateId, score: day }),
+        redis.zAdd(keys.waitingCrates(), { member: crateId, score: day }),
+      ]);
     }
   } catch (error) {
     await redis.hDel(playerKey, ['npcCratesSeeded']);

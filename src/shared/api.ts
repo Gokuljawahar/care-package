@@ -85,6 +85,18 @@ export type AppStateResponse = {
   lastSent: SentCrateSummary | null;
   radioFeed: RadioBroadcast[];
   myBroadcast: ClaimId | null;
+  isWarden: boolean;
+  wardenLawOptions: LawId[];
+  awayNotice: string | null;
+};
+
+export type WardenLawRequest = {
+  lawId: LawId;
+};
+
+export type WardenLawResponse = {
+  type: 'warden_law';
+  law: LawId;
 };
 
 export type RadioBroadcastRequest = {

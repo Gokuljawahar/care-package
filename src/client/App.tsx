@@ -8,6 +8,7 @@ import type {
   RadioBroadcastResponse,
   ScavengeResponse,
 } from '../shared/api';
+import type { LawId } from '../shared/game';
 import { getState } from './api';
 import { Doorstep } from './screens/Doorstep';
 import { Home } from './screens/Home';
@@ -15,6 +16,7 @@ import { Leaderboard } from './screens/Leaderboard';
 import { Radio } from './screens/Radio';
 import { Scavenge } from './screens/Scavenge';
 import { Send } from './screens/Send';
+import { Warden } from './screens/Warden';
 
 type Screen =
   | 'home'
@@ -22,6 +24,7 @@ type Screen =
   | 'doorstep'
   | 'send'
   | 'radio'
+  | 'warden'
   | 'leaderboard';
 
 export const App = () => {
@@ -90,6 +93,10 @@ export const App = () => {
           }
         : prev
     );
+  };
+
+  const handleWardenDecreed = (law: LawId) => {
+    setState((prev) => (prev ? { ...prev, law } : prev));
   };
 
   if (error) {
@@ -182,6 +189,20 @@ export const App = () => {
     );
   }
 
+  if (screen === 'warden') {
+    return (
+      <main className="app enter">
+        <Warden
+          day={state.day}
+          options={state.wardenLawOptions}
+          currentLaw={state.law}
+          onDecreed={handleWardenDecreed}
+          onBack={() => setScreen('home')}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="app enter">
       <Home
@@ -193,6 +214,7 @@ export const App = () => {
           setScreen('send');
         }}
         onRadio={() => setScreen('radio')}
+        onWarden={() => setScreen('warden')}
         onLeaderboard={() => setScreen('leaderboard')}
       />
     </main>

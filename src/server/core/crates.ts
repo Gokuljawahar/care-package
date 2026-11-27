@@ -33,8 +33,9 @@ import {
   toBunkerState,
   updatePlayerAtomic,
 } from './bunker';
-import { getDayDisaster, getDayLaw } from './day';
+import { getCurrentDay, getDayDisaster } from './day';
 import { keys } from './keys';
+import { resolveDayLaw } from './warden';
 
 const num = (v: string | undefined): number => {
   if (v === undefined) return 0;
@@ -238,7 +239,8 @@ export const sendCrate = async (
     return err(409, 'You already sent a care package today');
   }
 
-  const law = await getDayLaw(day);
+  const currentDay = await getCurrentDay();
+  const law = await resolveDayLaw(day, currentDay || day);
   if (req.targetMode === 'random' && law === 'friends_only') {
     return err(409, 'Warden law: random deliveries are suspended today');
   }
@@ -440,6 +442,7 @@ export const sendCrate = async (
         scanResult: '',
       }),
       redis.zAdd(keys.doorstep(recipientId), { member: crateId, score: day }),
+      redis.zAdd(keys.waitingCrates(), { member: crateId, score: day }),
       redis.hSet(keys.sentTo(senderId), { [recipientId]: String(day) }),
       redis.hSet(actionsKey, {
         sentCrateId: crateId,
@@ -488,7 +491,8 @@ export const scanCrate = async (
     return err(409, 'This crate was already scanned');
   }
 
-  const law = await getDayLaw(day);
+  const currentDay = await getCurrentDay();
+  const law = await resolveDayLaw(day, currentDay || day);
   const powerCost = scanCostFor(law);
   await ensureBunker(userId, username, day);
 
@@ -559,7 +563,7 @@ export const scanCrate = async (
       crateId,
       jammed,
       scanStatus,
-      powerCost,
+      powerCost: scanCostFor(law),
       bunker: deduct.bunker,
       checklist: checklistData.checklist,
       crates,
@@ -599,9 +603,10 @@ export const openCrate = async (
   let committed = false;
   try {
     await ensureBunker(userId, username, day);
+    const currentDay = await getCurrentDay();
     const [disaster, law] = await Promise.all([
       getDayDisaster(day),
-      getDayLaw(day),
+      resolveDayLaw(day, currentDay || day),
     ]);
 
     const kind: CrateKind = crate['kind'] === 'real' ? 'real' : 'trojan';
@@ -651,6 +656,7 @@ export const openCrate = async (
         openedDay: String(day),
       }),
       redis.zRem(keys.doorstep(userId), [crateId]),
+      redis.zRem(keys.waitingCrates(), [crateId]),
       recordDailyAction(day, userId),
     ]);
     committed = true;
@@ -682,6 +688,7 @@ export const openCrate = async (
             fields: {
               trustGood: String(nextTrustGood),
               trustTotal: String(nextTrustTotal),
+              trustUpdatedAt: String(Date.now()),
               cures: String(nextCures),
               food: String(nextFood),
               power: String(nextPower),
@@ -788,6 +795,7 @@ export const burnCrate = async (
     await Promise.all([
       redis.hSet(crateKey, { state: 'burned', burnedDay: String(day) }),
       redis.zRem(keys.doorstep(userId), [crateId]),
+      redis.zRem(keys.waitingCrates(), [crateId]),
       recordDailyAction(day, userId),
     ]);
     committed = true;

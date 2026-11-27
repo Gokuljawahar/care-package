@@ -12,6 +12,8 @@ import type {
   RadioBroadcastResponse,
   ScavengeRequest,
   ScavengeResponse,
+  WardenLawRequest,
+  WardenLawResponse,
 } from '../shared/api';
 
 export class ApiError extends Error {
@@ -66,6 +68,9 @@ export const postCrateBurn = (body: CrateActionRequest) =>
 
 export const postRadioBroadcast = (body: RadioBroadcastRequest) =>
   postJson<RadioBroadcastResponse>('/api/radio/broadcast', body);
+
+export const postWardenLaw = (body: WardenLawRequest) =>
+  postJson<WardenLawResponse>('/api/warden/law', body);
 
 export const getLeaderboard = () =>
   call<LeaderboardResponse>('/api/leaderboard');

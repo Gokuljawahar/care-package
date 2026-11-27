@@ -17,6 +17,7 @@ import {
   START_SCRAP,
   trustPercent,
 } from '../../shared/game';
+import { applyAwayCatchUp } from '../../shared/night';
 import { keys } from './keys';
 import { seedNewPlayerNpcCrates } from './npcs';
 
@@ -27,12 +28,16 @@ export type PlayerRecord = {
   scrap: number;
   infected: boolean;
   lastNightApplied: number;
+  infectionCheckedDay: number;
+  trustScoredDay: number;
   firstDay: number;
   daysSurvived: number;
   bestSurvival: number;
   cures: number;
   trustGood: number;
   trustTotal: number;
+  trustUpdatedAt: number;
+  joinedAt: number;
   seenReportDay: number;
 };
 
@@ -52,12 +57,19 @@ export const parseRecord = (
   scrap: Math.max(0, parseIntOr(h['scrap'], START_SCRAP)),
   infected: h['infected'] === '1',
   lastNightApplied: parseIntOr(h['lastNightApplied'], Math.max(0, day - 1)),
+  infectionCheckedDay: parseIntOr(
+    h['infectionCheckedDay'],
+    Math.max(0, day - 1)
+  ),
+  trustScoredDay: Math.max(0, parseIntOr(h['trustScoredDay'], 0)),
   firstDay: parseIntOr(h['firstDay'], day),
   daysSurvived: Math.max(0, parseIntOr(h['daysSurvived'], 0)),
   bestSurvival: Math.max(0, parseIntOr(h['bestSurvival'], 0)),
   cures: Math.max(0, parseIntOr(h['cures'], 0)),
   trustGood: Math.max(0, parseIntOr(h['trustGood'], 0)),
   trustTotal: Math.max(0, parseIntOr(h['trustTotal'], 0)),
+  trustUpdatedAt: Math.max(0, parseIntOr(h['trustUpdatedAt'], 0)),
+  joinedAt: Math.max(0, parseIntOr(h['joinedAt'], 0)),
   seenReportDay: Math.max(0, parseIntOr(h['seenReportDay'], 0)),
 });
 
@@ -88,6 +100,7 @@ export const ensureBunker = async (
   if (h['initialized'] !== '1') {
     const claimed = await redis.hSetNX(playerKey, 'initialized', '1');
     if (claimed === 1) {
+      const now = String(Date.now());
       await redis.hSet(playerKey, {
         food: String(START_FOOD),
         power: String(START_POWER),
@@ -95,12 +108,16 @@ export const ensureBunker = async (
         scrap: String(START_SCRAP),
         infected: '0',
         lastNightApplied: String(Math.max(0, day - 1)),
+        infectionCheckedDay: String(Math.max(0, day - 1)),
+        trustScoredDay: '0',
         firstDay: String(day),
         daysSurvived: '0',
         bestSurvival: '0',
         cures: '0',
         trustGood: '0',
         trustTotal: '0',
+        trustUpdatedAt: now,
+        joinedAt: now,
         seenReportDay: '0',
       });
       await redis.zAdd(keys.playersAll(), { member: userId, score: day });
@@ -136,6 +153,67 @@ export const updatePlayerAtomic = async <T>(
   atomicUpdateHash(redis, keys.player(userId), (h) =>
     updater(parseRecord(h, day))
   );
+
+/**
+ * Applies lazy away catch-up if `userId` missed one or more closed nights.
+ * Upkeep only (-1 Food, -1 Power), capped at 3 nights, Health floored at 1.
+ */
+export const applyLazyCatchUp = async (
+  userId: string,
+  latestClosedDay: number
+): Promise<string | null> => {
+  if (latestClosedDay <= 0) return null;
+
+  const outcome = await updatePlayerAtomic(
+    userId,
+    latestClosedDay,
+    (record) => {
+      if (record.lastNightApplied >= latestClosedDay) {
+        return { commit: false, result: null };
+      }
+      const missedNights = latestClosedDay - record.lastNightApplied;
+      const caught = applyAwayCatchUp({
+        food: record.food,
+        power: record.power,
+        health: record.health,
+        infected: record.infected,
+        missedNights,
+      });
+
+      return {
+        commit: true,
+        fields: {
+          food: String(caught.nextFood),
+          power: String(caught.nextPower),
+          health: String(caught.nextHealth),
+          lastNightApplied: String(latestClosedDay),
+          infectionCheckedDay: String(latestClosedDay),
+        },
+        result: {
+          missedNights,
+          ...caught,
+        },
+      };
+    }
+  );
+
+  if (!outcome) return null;
+
+  await redis.set(
+    keys.dayReport(latestClosedDay, userId),
+    JSON.stringify({
+      day: latestClosedDay,
+      away: true,
+      missedNights: outcome.missedNights,
+      foodLost: outcome.foodLost,
+      powerLost: outcome.powerLost,
+      healthLost: outcome.healthLost,
+      summary: outcome.summary,
+    })
+  );
+
+  return outcome.summary;
+};
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((item) => typeof item === 'string');
