@@ -1,18 +1,45 @@
-export type InitResponse = {
-  type: 'init';
-  postId: string;
-  count: number;
-  username: string;
+import type { GridCell } from './game';
+import type { Prompt } from './prompts';
+
+export type ErrorResponse = {
+  status: 'error';
+  message: string;
 };
 
-export type IncrementResponse = {
-  type: 'increment';
-  postId: string;
-  count: number;
+/** The player's tap on one prompt plus the crowd so far. */
+export type PromptReveal = {
+  promptId: string;
+  /** Player's cell (0..GRID-1). */
+  cx: number;
+  cy: number;
+  grid: GridCell[];
+  total: number;
+  score: number;
+  /** True if the player's neighbourhood is the hottest spot. */
+  hottest: boolean;
 };
 
-export type DecrementResponse = {
-  type: 'decrement';
-  postId: string;
-  count: number;
+export type TodayResponse = {
+  type: 'today';
+  day: number;
+  closed: boolean;
+  loggedIn: boolean;
+  prompts: Prompt[];
+  reveals: PromptReveal[];
+  streak: number;
+  bestStreak: number;
+  nextResetAt: number;
+  subredditName: string;
+};
+
+export type TapRequest = {
+  promptId: string;
+  x: number;
+  y: number;
+};
+
+export type TapResponse = {
+  type: 'tap';
+  reveal: PromptReveal;
+  done: boolean;
 };
