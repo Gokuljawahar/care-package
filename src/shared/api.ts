@@ -43,3 +43,19 @@ export type TapResponse = {
   reveal: PromptReveal;
   done: boolean;
 };
+
+export type ResultResponse = {
+  type: 'result';
+  day: number;
+  npc: number;
+  label: string;
+  reveals: PromptReveal[];
+  streak: number;
+  bestStreak: number;
+  /** "Top X%" among today's finishers (1 = best). */
+  topPercent: number;
+  players: number;
+  nextResetAt: number;
+  postUrl: string | null;
+  subredditName: string;
+};

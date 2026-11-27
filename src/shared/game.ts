@@ -3,6 +3,8 @@
 export const GRID = 40;
 export const PROMPTS_PER_DAY = 5;
 export const MIN_CROWD = 10;
+/** 1 = the 3x3 neighbourhood from the spec. Raise to 2 (5x5) if scores feel too harsh. */
+export const RADIUS = 1;
 
 /** One heatmap cell: [cellX, cellY, count]. */
 export type GridCell = [number, number, number];
@@ -46,11 +48,11 @@ export const gridToCells = (grid: GridMap): GridCell[] => {
 export const totalTaps = (grid: GridMap): number =>
   Object.values(grid).reduce((a, b) => a + b, 0);
 
-/** Taps in the 3x3 neighbourhood around (cx, cy). */
+/** Taps in the (2*RADIUS+1)^2 neighbourhood around (cx, cy). */
 export const neighbourhood = (grid: GridMap, cx: number, cy: number): number => {
   let sum = 0;
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dy = -1; dy <= 1; dy++) {
+  for (let dx = -RADIUS; dx <= RADIUS; dx++) {
+    for (let dy = -RADIUS; dy <= RADIUS; dy++) {
       sum += grid[cellKey(cx + dx, cy + dy)] ?? 0;
     }
   }
@@ -60,8 +62,8 @@ export const neighbourhood = (grid: GridMap, cx: number, cy: number): number => 
 export type Hotspot = { cx: number; cy: number; count: number };
 
 /**
- * Highest 3x3 neighbourhood count anywhere in the grid.
- * Each tapped cell spreads its count to its 9 neighbours; the busiest
+ * Highest neighbourhood count anywhere in the grid.
+ * Each tapped cell spreads its count to its neighbours; the busiest
  * accumulator is the hottest spot. Handles crowds split across hotspots.
  */
 export const hottest = (grid: GridMap): Hotspot => {
@@ -70,8 +72,8 @@ export const hottest = (grid: GridMap): Hotspot => {
   for (const [key, count] of Object.entries(grid)) {
     const c = parseCellKey(key);
     if (!c) continue;
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -RADIUS; dx <= RADIUS; dx++) {
+      for (let dy = -RADIUS; dy <= RADIUS; dy++) {
         const x = c[0] + dx;
         const y = c[1] + dy;
         if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue;

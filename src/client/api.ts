@@ -1,4 +1,10 @@
-import type { ErrorResponse, TapRequest, TapResponse, TodayResponse } from '../shared/api';
+import type {
+  ErrorResponse,
+  ResultResponse,
+  TapRequest,
+  TapResponse,
+  TodayResponse,
+} from '../shared/api';
 
 export class ApiError extends Error {
   constructor(
@@ -33,3 +39,5 @@ export const postTap = (body: TapRequest) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+export const getResult = () => call<ResultResponse>('/api/result');

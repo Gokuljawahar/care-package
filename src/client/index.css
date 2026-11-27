@@ -163,3 +163,30 @@ body,
     animation: none;
   }
 }
+
+/* Result card */
+.npc-number {
+  font-size: 84px;
+  background: linear-gradient(180deg, var(--color-yellow), var(--color-pink));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.label-pill {
+  padding: 6px 16px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  font-weight: 700;
+  font-size: 18px;
+}
+.mini {
+  background: var(--color-surface);
+}
+.mini-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #fff8ee;
+  border: 1.5px solid #1b1210;
+  transform: translate(-50%, -50%);
+}

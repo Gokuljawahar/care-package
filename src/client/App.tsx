@@ -1,30 +1,61 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import type { PromptReveal, TodayResponse } from '../shared/api';
-import { getToday } from './api';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import type { PromptReveal, ResultResponse, TodayResponse } from '../shared/api';
+import { getResult, getToday } from './api';
 import { Play } from './screens/Play';
+import { Result } from './screens/Result';
+
+type Screen = 'play' | 'result';
+
+const firstOpenIndex = (t: TodayResponse) => {
+  const i = t.prompts.findIndex((p) => !t.reveals.some((r) => r.promptId === p.id));
+  return i === -1 ? t.prompts.length : i;
+};
 
 export const App = () => {
   const [today, setToday] = useState<TodayResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [result, setResult] = useState<ResultResponse | null>(null);
+  const [screen, setScreen] = useState<Screen>('play');
   const [index, setIndex] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadResult = useCallback(() => {
+    setScreen('result');
+    getResult()
+      .then(setResult)
+      .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load result'));
+  }, []);
 
   useEffect(() => {
     getToday()
       .then((t) => {
         setToday(t);
-        const firstOpen = t.prompts.findIndex((p) => !t.reveals.some((r) => r.promptId === p.id));
-        setIndex(firstOpen === -1 ? Math.max(0, t.prompts.length - 1) : firstOpen);
+        const i = firstOpenIndex(t);
+        setIndex(Math.min(i, t.prompts.length - 1));
+        // Already finished today: straight to the result card.
+        if (t.prompts.length > 0 && i === t.prompts.length) loadResult();
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not load'));
-  }, []);
+  }, [loadResult]);
 
   const addReveal = (reveal: PromptReveal) =>
     setToday((t) => (t ? { ...t, reveals: [...t.reveals, reveal] } : t));
 
-  if (error) return <Shell><p className="text-pink">{error}</p></Shell>;
+  if (error) return <Shell><p className="font-semibold text-pink">{error}</p></Shell>;
   if (!today) return <Shell><p className="text-muted">Loading…</p></Shell>;
+
+  if (screen === 'result') {
+    return result ? (
+      <main className="app">
+        <Result result={result} prompts={today.prompts} />
+      </main>
+    ) : (
+      <Shell><p className="text-muted">Counting the crowd…</p></Shell>
+    );
+  }
+
   const prompt = today.prompts[index];
   if (!prompt) return <Shell><p className="text-muted">No prompts today.</p></Shell>;
+  const isLast = index === today.prompts.length - 1;
 
   return (
     <main className="app">
@@ -35,8 +66,8 @@ export const App = () => {
         count={today.prompts.length}
         existing={today.reveals.find((r) => r.promptId === prompt.id) ?? null}
         onReveal={addReveal}
-        onNext={() => setIndex((i) => Math.min(i + 1, today.prompts.length - 1))}
-        nextLabel="Next"
+        onNext={() => (isLast ? loadResult() : setIndex(index + 1))}
+        nextLabel={isLast ? 'See result' : 'Next'}
       />
     </main>
   );

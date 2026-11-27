@@ -3,6 +3,7 @@ import { context, redis } from '@devvit/web/server';
 import { cellKey, nextResetAt, toCell } from '../../shared/game';
 import type {
   ErrorResponse,
+  ResultResponse,
   TapRequest,
   TapResponse,
   TodayResponse,
@@ -10,6 +11,7 @@ import type {
 import { ensureDay, getDayPrompts, isDayClosed } from '../core/day';
 import { buildReveal, readGrid, readReveals } from '../core/crowd';
 import { keys } from '../core/keys';
+import { scoreDay, topPercent } from '../core/score';
 
 export const api = new Hono();
 
@@ -98,15 +100,47 @@ api.post('/tap', async (c) => {
 
     const grid = await readGrid(day, promptId);
     const reveal = buildReveal(promptId, grid, cx, cy);
-    const reveals = await readReveals(day, prompts.map((p) => p.id), userId);
+    const finished = await scoreDay(day, prompts.map((p) => p.id), userId);
 
-    return c.json<TapResponse>({
-      type: 'tap',
-      reveal,
-      done: reveals.length === prompts.length,
-    });
+    return c.json<TapResponse>({ type: 'tap', reveal, done: finished !== null });
   } catch (error) {
     console.error('POST /api/tap failed', error);
     return c.json(fail('Could not save your tap'), 500);
+  }
+});
+
+const postUrl = (): string | null => {
+  const id = context.postId;
+  if (!id) return null;
+  return `https://www.reddit.com/r/${context.subredditName}/comments/${id.replace(/^t3_/, '')}/`;
+};
+
+api.get('/result', async (c) => {
+  const { userId } = context;
+  if (!userId) return c.json(fail('Log in to play'), 401);
+  try {
+    const day = await resolveDay();
+    const prompts = await getDayPrompts(day);
+    const scored = await scoreDay(day, prompts.map((p) => p.id), userId);
+    if (!scored) return c.json(fail('Finish all prompts first'), 409);
+    const rank = await topPercent(day, userId);
+
+    return c.json<ResultResponse>({
+      type: 'result',
+      day,
+      npc: scored.npc,
+      label: scored.label,
+      reveals: scored.reveals,
+      streak: 0,
+      bestStreak: 0,
+      topPercent: rank.topPercent,
+      players: rank.players,
+      nextResetAt: nextResetAt(Date.now()),
+      postUrl: postUrl(),
+      subredditName: context.subredditName,
+    });
+  } catch (error) {
+    console.error('GET /api/result failed', error);
+    return c.json(fail('Could not load your result'), 500);
   }
 });

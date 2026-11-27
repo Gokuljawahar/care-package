@@ -41,10 +41,13 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
   const [showNext, setShowNext] = useState(Boolean(existing));
   const [error, setError] = useState<string | null>(null);
   const sending = useRef(false);
+  // Only the value at mount matters: App adds new reveals to its list, which
+  // would otherwise flip this mid-animation and cancel the bloom.
+  const [replay] = useState(Boolean(existing));
 
   // After the reveal arrives: bloom the heat outward, then offer Next.
   useEffect(() => {
-    if (!reveal || existing) return;
+    if (!reveal || replay) return;
     const quick = reducedMotion();
     const raf = requestAnimationFrame(() => setBloomed(true));
     const t = window.setTimeout(() => setShowNext(true), quick ? 0 : BLOOM_MS);
@@ -52,7 +55,7 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
       cancelAnimationFrame(raf);
       window.clearTimeout(t);
     };
-  }, [reveal, existing]);
+  }, [reveal, replay]);
 
   const onTap = async (e: MouseEvent<HTMLDivElement>) => {
     if (tap || sending.current) return;
@@ -96,7 +99,7 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
           className="stage relative overflow-hidden rounded-2xl"
           style={{ width: size, height: size }}
           data-revealed={Boolean(reveal)}
-          data-hot={Boolean(reveal?.hottest) && !existing}
+          data-hot={Boolean(reveal?.hottest) && !replay}
           onClick={(e) => void onTap(e)}
           role="button"
           aria-label={tap ? 'Tapped' : `Tap the picture: ${prompt.title}`}
@@ -113,7 +116,7 @@ export const Play = ({ prompt, index, count, existing, onReveal, onNext, nextLab
               <Heatmap cells={reveal.grid} />
             </div>
           )}
-          {tap && <Thumb x={tap.x} y={tap.y} pulse={Boolean(reveal) && !existing} />}
+          {tap && <Thumb x={tap.x} y={tap.y} pulse={Boolean(reveal) && !replay} />}
         </div>
       </div>
 
