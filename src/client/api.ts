@@ -8,6 +8,8 @@ import type {
   CrateSendResponse,
   ErrorResponse,
   LeaderboardResponse,
+  RadioBroadcastRequest,
+  RadioBroadcastResponse,
   ScavengeRequest,
   ScavengeResponse,
 } from '../shared/api';
@@ -61,6 +63,9 @@ export const postCrateOpen = (body: CrateActionRequest) =>
 
 export const postCrateBurn = (body: CrateActionRequest) =>
   postJson<CrateBurnResponse>('/api/crates/burn', body);
+
+export const postRadioBroadcast = (body: RadioBroadcastRequest) =>
+  postJson<RadioBroadcastResponse>('/api/radio/broadcast', body);
 
 export const getLeaderboard = () =>
   call<LeaderboardResponse>('/api/leaderboard');

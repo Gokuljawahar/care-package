@@ -10,6 +10,7 @@ import {
   type LawId,
 } from '../../shared/game';
 import { keys } from './keys';
+import { scoreDayBroadcasts } from './radio';
 import { postSummary, setSurvivorFlair } from './wrapup';
 
 export const getCurrentDay = async (): Promise<number> => {
@@ -110,6 +111,7 @@ export const closeDay = async (n: number): Promise<DayFinal | null> => {
   if (first !== 1) return null;
 
   const disaster = (await getDayDisaster(n)) ?? 'blackout';
+  await scoreDayBroadcasts(n, disaster);
   const activeCount = await redis.zCard(keys.dayActive(n));
   return {
     day: n,

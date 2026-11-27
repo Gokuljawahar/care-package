@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { context, redis } from '@devvit/web/server';
 import {
   GAME_NAME,
+  isClaimId,
   isCrateKind,
   isCrateResource,
   isScavengeSiteId,
@@ -40,7 +41,11 @@ import {
   isDayClosed,
 } from '../core/day';
 import { keys } from '../core/keys';
-import { readRadioFeedPreview } from '../core/npcs';
+import {
+  readMyBroadcast,
+  readRadioFeed,
+  submitBroadcast,
+} from '../core/radio';
 import { executeScavenge } from '../core/scavenge';
 
 export const api = new Hono();
@@ -153,7 +158,7 @@ api.get('/state', async (c) => {
       checklistData,
       crates,
       lastSent,
-      radioFeed,
+      myBroadcast,
     ] = await Promise.all([
       isDayClosed(day),
       loadWardenBanner(day),
@@ -168,8 +173,15 @@ api.get('/state', async (c) => {
           }),
       userId ? readDoorstep(userId) : Promise.resolve([]),
       userId ? readLastSent(day, userId) : Promise.resolve(null),
-      readRadioFeedPreview(day, disaster),
+      userId ? readMyBroadcast(day, userId) : Promise.resolve(null),
     ]);
+
+    const radioFeed = await readRadioFeed(
+      day,
+      userId ?? 'anon',
+      disaster,
+      law
+    );
 
     return c.json<AppStateResponse>({
       type: 'state',
@@ -192,6 +204,7 @@ api.get('/state', async (c) => {
       crates,
       lastSent,
       radioFeed,
+      myBroadcast,
     });
   } catch (error) {
     console.error('GET /api/state failed', error);
@@ -318,6 +331,39 @@ api.post('/crates/burn', async (c) => {
   } catch (error) {
     console.error('POST /api/crates/burn failed', error);
     return c.json(fail('Could not burn crate'), 500);
+  }
+});
+
+api.post('/radio/broadcast', async (c) => {
+  const { userId, username } = context;
+  if (!userId) return c.json(fail('Log in to broadcast'), 401);
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json(fail('Bad request'), 400);
+  }
+  if (
+    typeof rawBody !== 'object' ||
+    rawBody === null ||
+    !('claimId' in rawBody) ||
+    !isClaimId(rawBody.claimId)
+  ) {
+    return c.json(fail('Choose a valid broadcast claim'), 400);
+  }
+
+  try {
+    const day = await resolveDay();
+    if (await isDayClosed(day)) return c.json(fail('This day is closed'), 409);
+
+    const res = await submitBroadcast(userId, username, day, rawBody.claimId);
+    if (!res.ok) return c.json(fail(res.message), res.status);
+
+    return c.json(res);
+  } catch (error) {
+    console.error('POST /api/radio/broadcast failed', error);
+    return c.json(fail('Could not send broadcast'), 500);
   }
 });
 

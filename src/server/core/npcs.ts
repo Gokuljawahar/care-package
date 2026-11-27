@@ -70,7 +70,23 @@ export const seedNewPlayerNpcCrates = async (
 };
 
 /**
- * Returns 1-2 clearly labeled [NPC] broadcasts for `day`, persisted atomically.
+ * Reads or persists once per day the official true-but-vague signal for `day`.
+ */
+export const readOfficialSignal = async (
+  day: number,
+  disaster: DisasterId
+): Promise<string> => {
+  const key = keys.dayOfficialSignal(day);
+  const existing = await redis.get(key);
+  if (existing) return existing;
+
+  const generated = officialSignalForDay(day, disaster);
+  await redis.set(key, generated, { nx: true });
+  return (await redis.get(key)) ?? generated;
+};
+
+/**
+ * Returns 1-2 clearly labeled [NPC] broadcasts for `day`, persisted once per day.
  */
 export const readNpcBroadcasts = async (
   day: number,
@@ -100,21 +116,4 @@ export const readNpcBroadcasts = async (
     });
   }
   return out;
-};
-
-export const readRadioFeedPreview = async (
-  day: number,
-  disaster: DisasterId
-): Promise<RadioBroadcast[]> => {
-  const official: RadioBroadcast = {
-    id: `official_${day}`,
-    senderName: 'OFFICIAL SIGNAL',
-    senderTrust: null,
-    isNpc: false,
-    isOfficial: true,
-    claimId: null,
-    text: officialSignalForDay(day, disaster),
-  };
-  const npcFeed = await readNpcBroadcasts(day, disaster);
-  return [official, ...npcFeed];
 };

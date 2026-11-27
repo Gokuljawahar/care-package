@@ -84,6 +84,18 @@ export type AppStateResponse = {
   crates: DoorstepCrate[];
   lastSent: SentCrateSummary | null;
   radioFeed: RadioBroadcast[];
+  myBroadcast: ClaimId | null;
+};
+
+export type RadioBroadcastRequest = {
+  claimId: ClaimId;
+};
+
+export type RadioBroadcastResponse = {
+  type: 'radio_broadcast';
+  claimId: ClaimId;
+  checklist: DayChecklist;
+  radioFeed: RadioBroadcast[];
 };
 
 export type ScavengeRequest = {

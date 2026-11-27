@@ -5,6 +5,7 @@ import type {
   CrateOpenResponse,
   CrateScanResponse,
   CrateSendResponse,
+  RadioBroadcastResponse,
   ScavengeResponse,
 } from '../shared/api';
 import { getState } from './api';
@@ -73,6 +74,19 @@ export const App = () => {
             bunker: res.bunker,
             checklist: res.checklist,
             crates: res.crates,
+          }
+        : prev
+    );
+  };
+
+  const handleBroadcastComplete = (res: RadioBroadcastResponse) => {
+    setState((prev) =>
+      prev
+        ? {
+            ...prev,
+            checklist: res.checklist,
+            myBroadcast: res.claimId,
+            radioFeed: res.radioFeed,
           }
         : prev
     );
@@ -158,6 +172,10 @@ export const App = () => {
         <Radio
           day={state.day}
           feed={state.radioFeed}
+          myBroadcast={state.myBroadcast}
+          loggedIn={state.loggedIn}
+          closed={state.closed}
+          onBroadcastComplete={handleBroadcastComplete}
           onBack={() => setScreen('home')}
         />
       </main>

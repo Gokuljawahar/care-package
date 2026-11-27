@@ -504,7 +504,6 @@ export const isClaimTrue = (claim: ClaimId, disaster: DisasterId): boolean => {
     case 'stock_power':
       return (
         disaster === 'blackout' ||
-        disaster === 'nuclear' ||
         disaster === 'ai_uprising' ||
         disaster === 'zombie'
       );
@@ -752,4 +751,124 @@ export const pickNpcBroadcastSpecs = (
     { npcId: firstNpc.id, claimId: firstClaim },
     { npcId: secondNpc.id, claimId: secondClaim },
   ];
+};
+
+/** Deterministic PRNG seeded from an arbitrary string (FNV-1a + Mulberry32). */
+export const seedFromString = (input: string): (() => number) => {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    h ^= input.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  let state = h >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let t = Math.imul(state ^ (state >>> 15), 1 | state);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+export type PlayerBroadcastCandidate = {
+  userId: string;
+  username: string;
+  trust: number;
+  infected: boolean;
+  claimId: ClaimId;
+};
+
+const seededShuffle = <T>(
+  items: readonly T[],
+  rng: () => number
+): T[] => {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const a = arr[i];
+    const b = arr[j];
+    if (a !== undefined && b !== undefined) {
+      arr[i] = b;
+      arr[j] = a;
+    }
+  }
+  return arr;
+};
+
+/**
+ * Selects up to `limit` (4) player broadcasts deterministically per (day, viewerId):
+ * - If Warden law `hide_low_trust` is active, hides all <50% Trust (including Infected).
+ * - Otherwise Infected broadcasts always show, prefers high-Trust broadcasters,
+ *   and ensures at least 1 <50% Trust broadcaster when available.
+ */
+export const samplePlayerBroadcasts = (params: {
+  day: number;
+  viewerId: string;
+  law: LawId | undefined;
+  candidates: readonly PlayerBroadcastCandidate[];
+  limit?: number;
+}): PlayerBroadcastCandidate[] => {
+  const limit = params.limit ?? 4;
+  if (limit <= 0 || params.candidates.length === 0) return [];
+
+  const hideLowTrust = params.law === 'hide_low_trust';
+  const eligible = hideLowTrust
+    ? params.candidates.filter((c) => c.trust >= 50)
+    : [...params.candidates];
+
+  if (eligible.length === 0) return [];
+
+  const rng = seedFromString(`radio:${params.day}:${params.viewerId}`);
+  const ordered = seededShuffle(eligible, rng);
+  const infected = ordered.filter((c) => c.infected);
+  const regular = ordered.filter((c) => !c.infected);
+
+  const picked: PlayerBroadcastCandidate[] = [];
+  for (const item of infected) {
+    if (picked.length >= limit) break;
+    picked.push(item);
+  }
+
+  if (picked.length < limit) {
+    const lowTrust = regular.filter((c) => c.trust < 50);
+    const highTrust = regular
+      .filter((c) => c.trust >= 50)
+      .map((c, idx) => ({ item: c, tie: rng(), idx }))
+      .sort((a, b) =>
+        b.item.trust !== a.item.trust
+          ? b.item.trust - a.item.trust
+          : a.tie - b.tie || a.idx - b.idx
+      )
+      .map((entry) => entry.item);
+
+    const usedIds = new Set(picked.map((p) => p.userId));
+    if (
+      !hideLowTrust &&
+      !picked.some((p) => p.trust < 50) &&
+      lowTrust.length > 0
+    ) {
+      const lowPick = lowTrust[0];
+      if (lowPick) {
+        picked.push(lowPick);
+        usedIds.add(lowPick.userId);
+      }
+    }
+
+    for (const high of highTrust) {
+      if (picked.length >= limit) break;
+      if (!usedIds.has(high.userId)) {
+        picked.push(high);
+        usedIds.add(high.userId);
+      }
+    }
+
+    for (const low of lowTrust) {
+      if (picked.length >= limit) break;
+      if (!usedIds.has(low.userId)) {
+        picked.push(low);
+        usedIds.add(low.userId);
+      }
+    }
+  }
+
+  return seededShuffle(picked, rng);
 };
