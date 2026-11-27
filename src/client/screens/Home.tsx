@@ -8,6 +8,8 @@ import {
   START_POWER,
 } from '../../shared/game';
 import { StatBar } from '../components/StatBar';
+import { CrateArt } from '../components/CrateArt';
+import { DisasterArt } from '../components/DisasterArt';
 import { useCountdown } from '../hooks/useCountdown';
 
 type Props = {
@@ -49,14 +51,15 @@ export const Home = ({
         </div>
 
         <div className="flex flex-col items-center text-center">
-          <h1 className="font-display text-3xl leading-none font-bold tracking-tight">
+          <CrateArt state="sealed" size={56} />
+          <h1 className="mt-1 font-display text-3xl leading-none font-bold tracking-tight">
             {state.gameName}
           </h1>
-          <p className="mt-1.5 max-w-[300px] text-xs text-muted">
+          <p className="mt-1 max-w-[300px] text-xs text-muted">
             Every gift might be a trap. Every broadcast might be a lie.
           </p>
 
-          <div className="panel mt-3 flex w-full flex-col gap-2 p-3 text-left">
+          <div className="panel mt-2.5 flex w-full flex-col gap-1.5 p-2.5 text-left">
             <div className="flex items-center justify-between text-xs font-semibold">
               <span>Starter Bunker</span>
               <span className="text-amber">Scrap 2 · Trust 50%</span>
@@ -95,7 +98,10 @@ export const Home = ({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="chip truncate">Day {state.day} · Tonight: ???</span>
+        <span className="chip flex items-center gap-1.5 truncate">
+          <DisasterArt variant="unknown" size={18} />
+          <span>Day {state.day} · Tonight: ???</span>
+        </span>
         <div className="flex items-center gap-1.5">
           <span className="chip tabular-nums">{countdown}</span>
           <button
@@ -109,7 +115,7 @@ export const Home = ({
       </div>
 
       <section
-        className={`panel flex flex-col gap-1.5 px-3 py-2 ${bunker.infected ? 'infected-panel' : ''}`}
+        className={`panel flex flex-col gap-1.5 px-3 py-2 ${bunker.infected ? 'infected-panel infected-stripe' : ''}`}
       >
         <div className="flex items-center justify-between gap-2 text-xs font-bold">
           <span className="min-w-0 truncate">

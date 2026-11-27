@@ -1,6 +1,7 @@
-import { context, reddit, redis } from '@devvit/web/server';
+import { context, reddit, redis, settings } from '@devvit/web/server';
 import { isT3 } from '@devvit/web/shared';
 import {
+  canOverwriteFlair,
   CLAIMS,
   DISASTERS,
   GAME_NAME,
@@ -35,9 +36,14 @@ export const usernamesFor = async (
 };
 
 /**
- * Batch flair updates for active players on `day` (no commas in flair text).
+ * Batch flair updates for active players on `day`:
+ * - Respects the `setUserFlair` subreddit setting (default true).
+ * - Never overwrites non-Care-Package community flair.
  */
 export const setSurvivorFlair = async (day: number): Promise<number> => {
+  const flairEnabled = await settings.get<boolean>('setUserFlair');
+  if (flairEnabled === false) return 0;
+
   const activeRows = await redis.zRange(keys.dayActive(day), 0, -1, {
     by: 'rank',
   });
@@ -50,20 +56,44 @@ export const setSurvivorFlair = async (day: number): Promise<number> => {
     Promise.all(ids.map((id) => redis.hGetAll(keys.player(id)))),
   ]);
 
-  const flairs: { username: string; text: string }[] = [];
+  const candidates: { username: string; text: string }[] = [];
   ids.forEach((id, idx) => {
     const username = names.get(id);
     if (!username) return;
     const h = playerHashes[idx] ?? {};
     const infected = h['infected'] === '1';
     if (id === nextWardenId) {
-      flairs.push({ username, text: `Warden · Day ${day + 1}` });
+      candidates.push({ username, text: `Warden · Day ${day + 1}` });
     } else if (infected) {
-      flairs.push({ username, text: `Infected 🧟 · Day ${day}` });
+      candidates.push({ username, text: `Infected 🧟 · Day ${day}` });
     } else {
-      flairs.push({ username, text: `Survivor · Day ${day}` });
+      candidates.push({ username, text: `Survivor · Day ${day}` });
     }
   });
+  if (candidates.length === 0) return 0;
+
+  const existingFlairMap = new Map<string, string | undefined>();
+  try {
+    const subreddit = await reddit.getCurrentSubreddit();
+    const allUsernames = candidates.map((c) => c.username);
+    for (let i = 0; i < allUsernames.length; i += 100) {
+      const res = await subreddit.getUserFlair({
+        usernames: allUsernames.slice(i, i + 100),
+      });
+      for (const entry of res.users) {
+        if (entry.user) {
+          existingFlairMap.set(entry.user.toLowerCase(), entry.flairText);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Could not read existing subreddit user flair', error);
+    return 0;
+  }
+
+  const flairs = candidates.filter((c) =>
+    canOverwriteFlair(existingFlairMap.get(c.username.toLowerCase()))
+  );
 
   for (let i = 0; i < flairs.length; i += 100) {
     await reddit.setUserFlairBatch(

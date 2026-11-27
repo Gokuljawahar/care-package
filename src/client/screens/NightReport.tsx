@@ -3,6 +3,7 @@ import { showShareSheet, showToast } from '@devvit/web/client';
 import type { NightReportData } from '../../shared/api';
 import { DISASTERS, GAME_NAME } from '../../shared/game';
 import { postReportSeen } from '../api';
+import { DisasterArt } from '../components/DisasterArt';
 
 type Props = {
   report: NightReportData;
@@ -52,7 +53,8 @@ export const NightReport = ({ report, onDismiss }: Props) => {
     }
   };
 
-  const accent = report.disaster ? DISASTERS[report.disaster].accent : '#ffbe3b';
+  const disasterMeta = report.disaster ? DISASTERS[report.disaster] : null;
+  const accent = disasterMeta ? disasterMeta.accent : '#ffbe3b';
 
   return (
     <div className="flex h-full flex-col justify-between gap-2 px-4 pt-2.5 pb-3">
@@ -66,45 +68,58 @@ export const NightReport = ({ report, onDismiss }: Props) => {
       </div>
 
       <div
-        className={`panel flex flex-1 flex-col justify-between p-3.5 ${
+        className={`panel report-reveal flex flex-1 flex-col justify-between p-3 ${
           report.infected ? 'infected-panel' : ''
         }`}
       >
         <div>
           {report.away ? (
             <>
-              <h2 className="font-display text-2xl font-bold text-amber">
-                Away {report.missedNights}{' '}
-                {report.missedNights === 1 ? 'night' : 'nights'}
-              </h2>
-              <p className="mt-1 text-sm font-semibold">
-                {report.awaySummary}
-              </p>
+              <div className="flex items-center gap-3">
+                <DisasterArt variant="unknown" size={44} />
+                <div>
+                  <h2 className="font-display text-xl font-bold text-amber">
+                    Away {report.missedNights}{' '}
+                    {report.missedNights === 1 ? 'night' : 'nights'}
+                  </h2>
+                  <p className="text-xs font-semibold">{report.awaySummary}</p>
+                </div>
+              </div>
               <p className="mt-2 text-xs text-muted">
                 Missed nights apply upkeep only (capped at 3) and never drop
                 Health below 1.
               </p>
             </>
           ) : (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <h2
-                  className="font-display text-2xl leading-tight font-bold"
-                  style={{ color: accent }}
-                >
-                  {report.disasterName ?? 'Midnight'}
-                </h2>
-                <span className="pill">Trust {report.trust}%</span>
+            <div
+              className="disaster-banner flex items-center gap-2.5 rounded-2xl p-2.5"
+              style={{ borderColor: accent }}
+            >
+              <DisasterArt
+                variant={report.disaster ?? 'unknown'}
+                size={44}
+              />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <h2
+                    className="truncate font-display text-xl leading-tight font-bold"
+                    style={{ color: accent }}
+                  >
+                    {report.disasterName ?? 'Midnight'}
+                  </h2>
+                  <span className="pill shrink-0">Trust {report.trust}%</span>
+                </div>
+                <p className="truncate text-[11px] text-ink/90">
+                  {disasterMeta?.shortIntro ?? 'Night resolved.'}
+                </p>
+                <p className="truncate text-[11px] text-muted">
+                  {disasterMeta?.summary ?? ''}
+                </p>
               </div>
-              <p className="mt-0.5 text-xs text-muted">
-                {report.disaster
-                  ? DISASTERS[report.disaster].summary
-                  : 'Night resolved.'}
-              </p>
-            </>
+            </div>
           )}
 
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
+          <div className="mt-2 flex flex-wrap gap-1.5">
             {report.foodDelta !== 0 && (
               <span
                 className={`pill ${report.foodDelta > 0 ? 'text-toxic' : 'text-danger'}`}
@@ -136,25 +151,25 @@ export const NightReport = ({ report, onDismiss }: Props) => {
           </div>
 
           {!report.away && (
-            <div className="mt-2.5 flex flex-col gap-1 text-xs">
+            <div className="mt-2 flex flex-col gap-1 text-xs">
               {report.sentCrateNote && (
-                <p className="text-ink/90">📦 {report.sentCrateNote}</p>
+                <p className="truncate text-ink/90">📦 {report.sentCrateNote}</p>
               )}
               {report.broadcastClaimText && (
                 <p
-                  className={
+                  className={`truncate ${
                     report.broadcastTrue ? 'text-toxic' : 'text-danger'
-                  }
+                  }`}
                 >
-                  📻 Your claim “{report.broadcastClaimText}” was{' '}
-                  {report.broadcastTrue ? 'TRUE (+Trust)' : 'FALSE (-Trust)'}.
+                  📻 “{report.broadcastClaimText}” —{' '}
+                  {report.broadcastTrue ? 'TRUE (+Trust)' : 'FALSE (-Trust)'}
                 </p>
               )}
               {report.liarCallout && (
-                <p className="text-muted">🕵️ {report.liarCallout}</p>
+                <p className="truncate text-muted">🕵️ {report.liarCallout}</p>
               )}
               {report.nextWardenName && (
-                <p className="text-amber">
+                <p className="truncate text-amber">
                   👑 New Warden: u/{report.nextWardenName}
                 </p>
               )}
@@ -162,7 +177,7 @@ export const NightReport = ({ report, onDismiss }: Props) => {
           )}
         </div>
 
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {!report.away && (
             <button
               className="btn btn-secondary w-full"

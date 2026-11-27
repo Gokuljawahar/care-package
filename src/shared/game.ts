@@ -639,6 +639,25 @@ export const nextResetAt = (now: number): number => {
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 };
 
+export const FLAIR_PREFIXES: readonly string[] = [
+  'Survivor ·',
+  'Infected 🧟 ·',
+  'Warden ·',
+];
+
+/**
+ * Protects community flair: only sets Care Package flair if the user has no
+ * flair text or already wears a Care Package flair prefix.
+ */
+export const canOverwriteFlair = (
+  existingFlairText: string | undefined
+): boolean => {
+  if (!existingFlairText) return true;
+  const trimmed = existingFlairText.trim();
+  if (trimmed === '') return true;
+  return FLAIR_PREFIXES.some((prefix) => trimmed.startsWith(prefix));
+};
+
 export type NpcProfile = {
   id: string;
   name: string;

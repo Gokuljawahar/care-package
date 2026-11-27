@@ -143,9 +143,97 @@ button:focus-visible,
   );
 }
 
+.infected-stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    rgb(74 222 128 / 0.06),
+    rgb(74 222 128 / 0.06) 8px,
+    transparent 8px,
+    transparent 16px
+  );
+}
+
+.disaster-banner {
+  background: rgb(23 18 14 / 0.65);
+  border: 1.5px solid var(--color-surface-2);
+}
+
 .away-banner {
   background: rgb(255 190 59 / 0.12);
   border: 1px solid rgb(255 190 59 / 0.35);
+}
+
+.crate-shake {
+  animation: crate-shake 240ms ease-in-out infinite;
+}
+@keyframes crate-shake {
+  0%,
+  100% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-4px) rotate(-3deg);
+  }
+  75% {
+    transform: translateX(4px) rotate(3deg);
+  }
+}
+
+.crate-burst {
+  animation: crate-pop 380ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.crate-trojan-pop {
+  animation: crate-pop 340ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes crate-pop {
+  0% {
+    transform: scale(0.84);
+    opacity: 0.4;
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.trojan-flash {
+  animation: trojan-flash 450ms ease;
+}
+@keyframes trojan-flash {
+  0% {
+    background-color: rgb(251 90 107 / 0.34);
+  }
+  100% {
+    background-color: var(--color-surface);
+  }
+}
+
+.radar-pulse {
+  transform-origin: 24px 24px;
+  animation: radar-pulse 2.2s ease-out infinite;
+}
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.75);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.1);
+    opacity: 0.15;
+  }
+}
+
+.report-reveal {
+  animation: report-reveal 360ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+@keyframes report-reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .pill {
@@ -250,7 +338,13 @@ button:focus-visible,
 
 @media (prefers-reduced-motion: reduce) {
   .enter,
-  .loading-dot {
+  .loading-dot,
+  .crate-shake,
+  .crate-burst,
+  .crate-trojan-pop,
+  .trojan-flash,
+  .radar-pulse,
+  .report-reveal {
     animation: none;
   }
   .btn,

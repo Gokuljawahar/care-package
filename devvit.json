@@ -32,8 +32,32 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/debug-hurt"
+      },
+      {
+        "label": "Debug: infect me",
+        "description": "DEV ONLY (thumbprint_daily_dev): sets Health 0 and Infected",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/debug-infect"
+      },
+      {
+        "label": "Debug: reset my daily actions",
+        "description": "DEV ONLY (thumbprint_daily_dev): clears today's scavenge/send/broadcast/cooldown flags",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/debug-reset-actions"
       }
     ]
+  },
+  "settings": {
+    "subreddit": {
+      "setUserFlair": {
+        "type": "boolean",
+        "label": "Set Care Package user flair",
+        "helpText": "Sets Survivor, Infected, and Warden user flair at midnight without overwriting existing community flair.",
+        "defaultValue": true
+      }
+    }
   },
   "triggers": {
     "onAppInstall": "/internal/triggers/on-app-install"

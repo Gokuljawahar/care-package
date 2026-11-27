@@ -9,6 +9,7 @@ import type {
 } from '../../shared/api';
 import { scanCostFor, type LawId } from '../../shared/game';
 import { postCrateBurn, postCrateOpen, postCrateScan } from '../api';
+import { CrateArt } from '../components/CrateArt';
 
 type Props = {
   crates: DoorstepCrate[];
@@ -21,6 +22,10 @@ type Props = {
   onSendBack: (username: string) => void;
   onBack: () => void;
 };
+
+const prefersReducedMotion = (): boolean =>
+  typeof window !== 'undefined' &&
+  window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const Doorstep = ({
   crates,
@@ -35,6 +40,7 @@ export const Doorstep = ({
 }: Props) => {
   const [index, setIndex] = useState(0);
   const [pending, setPending] = useState(false);
+  const [opening, setOpening] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<CrateOpenOutcome | null>(null);
   const [burnedMsg, setBurnedMsg] = useState<string | null>(null);
@@ -42,6 +48,9 @@ export const Doorstep = ({
   const scanCost = scanCostFor(law ?? undefined);
   const safeIndex = crates.length === 0 ? 0 : Math.min(index, crates.length - 1);
   const activeCrate = crates[safeIndex] ?? null;
+
+  const senderLabel = (name: string, isNpc: boolean) =>
+    isNpc ? name : `u/${name}`;
 
   const handleScan = async (crateId: string) => {
     if (pending) return;
@@ -60,20 +69,23 @@ export const Doorstep = ({
   const handleOpen = async (crateId: string) => {
     if (pending) return;
     setPending(true);
+    setOpening(true);
     setError(null);
+    const minWait = prefersReducedMotion() ? 0 : 420;
     try {
-      const res = await postCrateOpen({ crateId });
+      const [res] = await Promise.all([
+        postCrateOpen({ crateId }),
+        new Promise((resolve) => setTimeout(resolve, minWait)),
+      ]);
       setOutcome(res.outcome);
       onOpened(res);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not open crate');
     } finally {
+      setOpening(false);
       setPending(false);
     }
   };
-
-  const senderLabel = (name: string, isNpc: boolean) =>
-    isNpc ? name : `u/${name}`;
 
   const handleBurn = async (crate: DoorstepCrate) => {
     if (pending) return;
@@ -108,12 +120,20 @@ export const Doorstep = ({
 
       {outcome ? (
         <div
-          className={`panel flex flex-1 flex-col justify-between p-3.5 ${
-            outcome.kind === 'trojan' ? 'trojan-panel' : 'real-panel'
+          className={`panel flex flex-1 flex-col justify-between p-3 ${
+            outcome.kind === 'trojan'
+              ? 'trojan-panel trojan-flash'
+              : 'real-panel'
           }`}
         >
-          <div>
-            <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col items-center text-center">
+            <CrateArt
+              state={
+                outcome.kind === 'trojan' ? 'opened_trojan' : 'opened_real'
+              }
+              size={64}
+            />
+            <div className="mt-1 flex items-center gap-2">
               <span
                 className={`text-lg font-bold ${
                   outcome.kind === 'trojan' ? 'text-danger' : 'text-toxic'
@@ -121,7 +141,7 @@ export const Doorstep = ({
               >
                 {outcome.kind === 'trojan'
                   ? 'Trojan Trap!'
-                  : 'Care Package Opened'}
+                  : 'Supplies Secured'}
               </span>
               <span className="pill">
                 {senderLabel(outcome.fromUsername, outcome.fromIsNpc)} ·{' '}
@@ -139,7 +159,7 @@ export const Doorstep = ({
                   : `Real ${outcome.resource ?? 'supplies'} inside (+1 bonus included).`}
             </p>
 
-            <div className="mt-3 flex flex-wrap gap-1.5">
+            <div className="mt-2 flex flex-wrap justify-center gap-1.5">
               {outcome.foodDelta !== 0 && (
                 <span
                   className={`pill ${outcome.foodDelta > 0 ? 'text-toxic' : 'text-danger'}`}
@@ -182,7 +202,7 @@ export const Doorstep = ({
             </div>
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             {!outcome.fromIsNpc && !sentToday && (
               <button
                 className="btn btn-secondary w-full"
@@ -220,9 +240,10 @@ export const Doorstep = ({
         </div>
       ) : !activeCrate ? (
         <div className="panel flex flex-1 flex-col justify-between p-4 text-center">
-          <div className="my-auto">
+          <div className="my-auto flex flex-col items-center gap-2">
+            <CrateArt state="sealed" size={60} />
             <p className="text-base font-bold">Doorstep is clear</p>
-            <p className="mt-1 text-xs text-muted">
+            <p className="text-xs text-muted">
               No crates waiting right now. Send one to a survivor to start a
               trade.
             </p>
@@ -232,12 +253,12 @@ export const Doorstep = ({
           </button>
         </div>
       ) : (
-        <div className="panel flex flex-1 flex-col justify-between p-3.5">
+        <div className="panel flex flex-1 flex-col justify-between p-3">
           <div>
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <p className="truncate text-base font-bold">
+                  <p className="truncate text-sm font-bold">
                     From{' '}
                     {senderLabel(
                       activeCrate.fromUsername,
@@ -248,7 +269,7 @@ export const Doorstep = ({
                     <span className="pill text-amber">NPC</span>
                   )}
                 </div>
-                <p className="text-xs text-muted">
+                <p className="text-[11px] text-muted">
                   Trust {activeCrate.fromTrust}% · Sent Day {activeCrate.day}
                 </p>
               </div>
@@ -277,7 +298,15 @@ export const Doorstep = ({
               )}
             </div>
 
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-surface-2/70 px-3 py-2.5 text-xs font-semibold">
+            <div className="my-1.5 flex justify-center">
+              <CrateArt
+                state={opening ? 'opening' : 'sealed'}
+                scanStatus={activeCrate.scanStatus}
+                size={64}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-xl bg-surface-2/70 px-3 py-2 text-xs font-semibold">
               <span>Scanner reading</span>
               <span
                 className={
@@ -301,19 +330,19 @@ export const Doorstep = ({
             </div>
 
             {error && (
-              <p className="mt-2 text-center text-xs font-semibold text-danger">
+              <p className="mt-1.5 text-center text-xs font-semibold text-danger">
                 {error}
               </p>
             )}
           </div>
 
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
             <button
               className="btn btn-primary w-full"
               disabled={pending}
               onClick={() => void handleOpen(activeCrate.id)}
             >
-              Open Crate
+              {opening ? 'Cracking lid…' : 'Open Crate'}
             </button>
             <div className="grid grid-cols-2 gap-2">
               <button
