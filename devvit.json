@@ -1,6 +1,6 @@
 {
   "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
-  "name": "thumbprint",
+  "name": "thumbprint-daily",
   "post": {
     "dir": "dist/client",
     "entrypoints": {
@@ -46,5 +46,8 @@
         "cron": "0 0 * * *"
       }
     }
+  },
+  "dev": {
+    "subreddit": "thumbprint_daily_dev"
   }
 }
