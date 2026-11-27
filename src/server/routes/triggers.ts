@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import type { OnAppInstallRequest, TriggerResponse } from '@devvit/web/shared';
+import { GAME_NAME } from '../../shared/game';
 import { getCurrentDay, runDailyReset } from '../core/day';
 
 export const triggers = new Hono();
 
-// First install: create Thumbprint #1 straight away.
+// First install: create Care Package #1 straight away.
 triggers.post('/on-app-install', async (c) => {
   try {
     const input = await c.req.json<OnAppInstallRequest>();
@@ -18,7 +19,7 @@ triggers.post('/on-app-install', async (c) => {
     return c.json<TriggerResponse>(
       {
         status: 'success',
-        message: `Created Thumbprint #${opened.day} (${opened.postId}) on ${input.type}`,
+        message: `Created ${GAME_NAME} #${opened.day} (${opened.postId}) on ${input.type}`,
       },
       200
     );

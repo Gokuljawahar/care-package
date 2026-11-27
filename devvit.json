@@ -20,7 +20,7 @@
   "menu": {
     "items": [
       {
-        "label": "Create today's Thumbprint post",
+        "label": "Create today's Care Package post",
         "description": "Closes the current day and posts the next one",
         "location": "subreddit",
         "forUserType": "moderator",

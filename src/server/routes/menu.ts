@@ -1,17 +1,18 @@
 import { Hono } from 'hono';
 import type { UiResponse } from '@devvit/web/shared';
 import { context } from '@devvit/web/server';
+import { GAME_NAME } from '../../shared/game';
 import { runDailyReset } from '../core/day';
 
 export const menu = new Hono();
 
-// "Create today's Thumbprint post": same steps as the midnight job, run by hand.
+// "Create today's Care Package post": same steps as the midnight job, run by hand.
 menu.post('/create-today', async (c) => {
   try {
     const { opened } = await runDailyReset();
     return c.json<UiResponse>(
       {
-        showToast: `Thumbprint #${opened.day} is live`,
+        showToast: `${GAME_NAME} #${opened.day} is live`,
         navigateTo: `https://www.reddit.com/r/${context.subredditName}/comments/${opened.postId.replace(/^t3_/, '')}/`,
       },
       200

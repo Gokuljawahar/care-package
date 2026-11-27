@@ -1,15 +1,16 @@
 import { reddit, redis } from '@devvit/web/server';
 import {
-  gridFromHash,
-  npcPercent,
-  parseCellKey,
-  promptScore,
-  PROMPTS_PER_DAY,
-  type GridMap,
+  DISASTER_IDS,
+  DISASTERS,
+  GAME_NAME,
+  isDisasterId,
+  isLawId,
+  postTitleForDay,
+  type DisasterId,
+  type LawId,
 } from '../../shared/game';
-import { PROMPTS, promptById, type Prompt } from '../../shared/prompts';
 import { keys } from './keys';
-import { postSummary, setStreakFlair } from './wrapup';
+import { postSummary, setSurvivorFlair } from './wrapup';
 
 export const getCurrentDay = async (): Promise<number> => {
   const raw = await redis.get(keys.currentDay());
@@ -17,136 +18,76 @@ export const getCurrentDay = async (): Promise<number> => {
   return Number.isInteger(n) && n > 0 ? n : 0;
 };
 
-const readIds = async (n: number): Promise<string[]> => {
-  const raw = await redis.get(keys.dayPrompts(n));
-  return raw ? raw.split(',').filter(Boolean) : [];
-};
-
-export const getDayPrompts = async (n: number): Promise<Prompt[]> =>
-  (await readIds(n))
-    .map((id) => promptById(id))
-    .filter((p): p is Prompt => p !== undefined);
-
 export const getDayPostId = async (n: number): Promise<string | undefined> =>
   redis.get(keys.dayPost(n));
 
 export const isDayClosed = async (n: number): Promise<boolean> =>
   (await redis.exists(keys.dayClosed(n))) > 0;
 
+export const getDayDisaster = async (
+  n: number
+): Promise<DisasterId | undefined> => {
+  const raw = await redis.get(keys.dayDisaster(n));
+  return isDisasterId(raw) ? raw : undefined;
+};
+
+export const getDayLaw = async (n: number): Promise<LawId | undefined> => {
+  const raw = await redis.get(keys.dayLaw(n));
+  return isLawId(raw) ? raw : undefined;
+};
+
+export const getDayWarden = async (n: number): Promise<string | undefined> => {
+  const raw = await redis.get(keys.dayWarden(n));
+  return raw || undefined;
+};
+
+/** Picks a disaster for day `n` without repeating yesterday's disaster. */
+const pickDisaster = async (n: number): Promise<DisasterId> => {
+  const yesterday = n > 1 ? await getDayDisaster(n - 1) : undefined;
+  const pool = DISASTER_IDS.filter((id) => id !== yesterday);
+  const picked = pool[Math.floor(Math.random() * pool.length)];
+  return picked ?? 'blackout';
+};
+
+const ensureDayDisaster = async (n: number): Promise<DisasterId> => {
+  const existing = await getDayDisaster(n);
+  if (existing) return existing;
+  const picked = await pickDisaster(n);
+  await redis.set(keys.dayDisaster(n), picked, { nx: true });
+  return (await getDayDisaster(n)) ?? picked;
+};
+
 /**
- * Returns the current day, bootstrapping day 1's prompts if nothing exists yet
- * (so a playtest works before the first scheduled post is created).
+ * Returns the current day, bootstrapping day 1's secret disaster if nothing
+ * exists yet so a playtest works before the first post is created.
  */
 export const ensureDay = async (): Promise<number> => {
   const current = await getCurrentDay();
   if (current > 0) {
-    // A day that has no post yet (playtest bootstrap) is topped up to a full set,
-    // e.g. if it was created while there were fewer prompts per day.
-    const ids = await readIds(current);
-    if (ids.length < PROMPTS_PER_DAY && !(await getDayPostId(current))) {
-      const extra = (await pickPrompts(current)).filter(
-        (id) => !ids.includes(id)
-      );
-      const full = [...ids, ...extra].slice(0, PROMPTS_PER_DAY);
-      await redis.set(keys.dayPrompts(current), full.join(','));
-    }
+    await ensureDayDisaster(current);
     return current;
   }
-  const ids = await pickPrompts(1);
-  await redis.set(keys.dayPrompts(1), ids.join(','));
+  await ensureDayDisaster(1);
   await redis.set(keys.currentDay(), '1');
   return 1;
 };
 
-// --- prompt selection -------------------------------------------------------
-
-const seeded = (seed: number) => () => {
-  seed = (seed + 0x6d2b79f5) | 0;
-  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-};
-
-/**
- * Picks the day's prompts: one divisive ("spicy") prompt first, then unused
- * prompts, never two with the same picture. When the unused pool runs dry it
- * starts a new cycle (avoiding yesterday's prompts).
- */
-const pickPrompts = async (n: number): Promise<string[]> => {
-  const used = new Set(await redis.hKeys(keys.usedPrompts()));
-  const yesterday = new Set(await readIds(n - 1));
-  let pool = PROMPTS.filter((p) => !used.has(p.id));
-  if (pool.length < PROMPTS_PER_DAY + 2) {
-    await redis.del(keys.usedPrompts());
-    pool = PROMPTS.filter((p) => !yesterday.has(p.id));
-  }
-  const rnd = seeded(n * 7919);
-  const shuffle = <T>(list: T[]): T[] => {
-    const a = [...list];
-    for (let i = a.length - 1; i > 0; i--) {
-      const j = Math.floor(rnd() * (i + 1));
-      const tmp = a[i];
-      const other = a[j];
-      if (tmp === undefined || other === undefined) continue;
-      a[i] = other;
-      a[j] = tmp;
-    }
-    return a;
-  };
-  const shuffled = shuffle(pool);
-
-  // Spicy first: an unused one if any, otherwise any spicy not used yesterday.
-  const spicy =
-    shuffled.find((p) => p.spicy) ??
-    shuffle(PROMPTS.filter((p) => p.spicy && !yesterday.has(p.id)))[0];
-
-  const picked: Prompt[] = spicy ? [spicy] : [];
-  const fill = (candidates: Prompt[]) => {
-    for (const p of candidates) {
-      if (picked.length >= PROMPTS_PER_DAY) return;
-      if (
-        picked.some(
-          (q) => q.id === p.id || q.svgComponentName === p.svgComponentName
-        )
-      )
-        continue;
-      if (p.spicy) continue; // one divisive prompt a day is enough
-      picked.push(p);
-    }
-  };
-  fill(shuffled);
-  fill(shuffle(PROMPTS.filter((p) => !yesterday.has(p.id))));
-
-  const ids = picked.map((p) => p.id);
-  await redis.hSet(
-    keys.usedPrompts(),
-    Object.fromEntries(ids.map((id) => [id, String(n)]))
-  );
-  return ids;
-};
-
-// --- opening and closing days -----------------------------------------------
-
 export type Opened = { day: number; postId: string };
 
-/** Creates day n's post (picking its prompts if needed) and makes it current. */
+/** Creates day n's spoiler-free post (picking its disaster if needed) and makes it current. */
 export const openDay = async (n: number): Promise<Opened> => {
   const existing = await getDayPostId(n);
   if (existing) {
+    await ensureDayDisaster(n);
     await redis.set(keys.currentDay(), String(n));
     return { day: n, postId: existing };
   }
-  let ids = await readIds(n);
-  if (ids.length === 0) {
-    ids = await pickPrompts(n);
-    await redis.set(keys.dayPrompts(n), ids.join(','));
-  }
-  const first = promptById(ids[0] ?? '');
+  await ensureDayDisaster(n);
   const post = await reddit.submitCustomPost({
-    title: `Thumbprint #${n}: ${first?.title ?? 'Tap where everyone else taps'}`,
+    title: `${GAME_NAME} #${n}: ${postTitleForDay(n)}`,
     postData: { day: n },
     textFallback: {
-      text: `Thumbprint #${n}. Tap where you think everyone else will tap.`,
+      text: `${GAME_NAME} #${n}. In the apocalypse, every gift might be a trap and every broadcast might be a lie.`,
     },
   });
   await redis.set(keys.dayPost(n), post.id);
@@ -157,47 +98,25 @@ export const openDay = async (n: number): Promise<Opened> => {
 export type DayFinal = {
   day: number;
   postId: string | undefined;
-  prompts: Prompt[];
-  grids: Record<string, GridMap>;
-  /** userId -> final NPC % (finishers only). */
-  npc: Map<string, number>;
+  disaster: DisasterId;
+  activeCount: number;
 };
 
 /**
- * Freezes day n: no more taps, and every finisher's NPC % is recomputed once
- * against the final crowd. Reads each grid/taps hash once (not per player).
- * Returns null if the day was already closed.
+ * Freezes day n idempotently. Returns null if the day was already closed.
  */
 export const closeDay = async (n: number): Promise<DayFinal | null> => {
   const first = await redis.incrBy(keys.dayClosed(n), 1);
   if (first !== 1) return null;
 
-  const prompts = await getDayPrompts(n);
-  const grids: Record<string, GridMap> = {};
-  const scores = new Map<string, number[]>();
-  for (const p of prompts) {
-    const grid = gridFromHash(await redis.hGetAll(keys.grid(n, p.id)));
-    grids[p.id] = grid;
-    const taps = await redis.hGetAll(keys.taps(n, p.id));
-    for (const [userId, cell] of Object.entries(taps)) {
-      const c = parseCellKey(cell);
-      if (!c) continue;
-      const list = scores.get(userId) ?? [];
-      list.push(promptScore(grid, c[0], c[1]));
-      scores.set(userId, list);
-    }
-  }
-
-  const npc = new Map<string, number>();
-  for (const [userId, list] of scores) {
-    if (list.length === prompts.length) npc.set(userId, npcPercent(list));
-  }
-  const members = [...npc].map(([member, score]) => ({ member, score }));
-  for (let i = 0; i < members.length; i += 500) {
-    await redis.zAdd(keys.npc(n), ...members.slice(i, i + 500));
-  }
-
-  return { day: n, postId: await getDayPostId(n), prompts, grids, npc };
+  const disaster = (await getDayDisaster(n)) ?? 'blackout';
+  const activeCount = await redis.zCard(keys.dayActive(n));
+  return {
+    day: n,
+    postId: await getDayPostId(n),
+    disaster,
+    activeCount,
+  };
 };
 
 export type ResetResult = {
@@ -205,13 +124,12 @@ export type ResetResult = {
   opened: Opened;
   flairs: number;
   commented: boolean;
+  disasterRevealed: string | null;
 };
 
 /**
  * The daily job (also run by the moderator menu):
  * close the current day, then open the next one with a new post.
- * If the current day has no post yet (fresh install / playtest), it just
- * creates that post instead of skipping a day.
  */
 export const runDailyReset = async (): Promise<ResetResult> => {
   const lock = await redis.incrBy(keys.resetLock(), 1);
@@ -221,19 +139,23 @@ export const runDailyReset = async (): Promise<ResetResult> => {
 
   try {
     const n = await getCurrentDay();
-    const fresh = { closed: null, flairs: 0, commented: false };
+    const fresh: Omit<ResetResult, 'opened'> = {
+      closed: null,
+      flairs: 0,
+      commented: false,
+      disasterRevealed: null,
+    };
     if (n === 0) return { ...fresh, opened: await openDay(1) };
     if (!(await getDayPostId(n))) return { ...fresh, opened: await openDay(n) };
 
     const final = await closeDay(n);
     const opened = await openDay(n + 1);
 
-    // Wrap-up is best effort: a flair or comment failure must not block the new day.
     let flairs = 0;
     let commented = false;
     if (final) {
       try {
-        flairs = await setStreakFlair(final);
+        flairs = await setSurvivorFlair(final);
       } catch (error) {
         console.error(`Flair update for day ${n} failed`, error);
       }
@@ -244,7 +166,13 @@ export const runDailyReset = async (): Promise<ResetResult> => {
         console.error(`Summary comment for day ${n} failed`, error);
       }
     }
-    return { closed: n, opened, flairs, commented };
+    return {
+      closed: n,
+      opened,
+      flairs,
+      commented,
+      disasterRevealed: final ? DISASTERS[final.disaster].name : null,
+    };
   } finally {
     await redis.del(keys.resetLock());
   }

@@ -1,116 +1,364 @@
-// Game rules shared by server (authoritative) and client (display only).
+// Game rules and constants shared by server (authoritative) and client (display only).
 
-export const GRID = 40;
-export const PROMPTS_PER_DAY = 5;
-export const MIN_CROWD = 10;
-/** 1 = the 3x3 neighbourhood from the spec. Raise to 2 (5x5) if scores feel too harsh. */
-export const RADIUS = 1;
+export const GAME_NAME = 'Care Package';
 
-/** One heatmap cell: [cellX, cellY, count]. */
-export type GridCell = [number, number, number];
+export const POST_TEASERS: readonly string[] = [
+  'Who do you trust?',
+  'Something is coming',
+  'Check your doorstep',
+  'The radio is lying',
+  'Lock the hatch',
+];
 
-/** Sparse grid: "x,y" -> count (exactly the redis hash shape). */
-export type GridMap = Record<string, number>;
-
-export const toCell = (v: number): number =>
-  Math.min(GRID - 1, Math.max(0, Math.floor(v * GRID)));
-
-export const cellKey = (cx: number, cy: number): string => `${cx},${cy}`;
-
-export const parseCellKey = (key: string): [number, number] | null => {
-  const [a, b] = key.split(',');
-  const cx = Number(a);
-  const cy = Number(b);
-  if (!Number.isInteger(cx) || !Number.isInteger(cy)) return null;
-  if (cx < 0 || cy < 0 || cx >= GRID || cy >= GRID) return null;
-  return [cx, cy];
+export const postTitleForDay = (day: number): string => {
+  const idx = (Math.max(1, day) - 1) % POST_TEASERS.length;
+  return POST_TEASERS[idx] ?? 'Who do you trust?';
 };
 
-/** Redis returns hash values as strings. */
-export const gridFromHash = (hash: Record<string, string>): GridMap => {
-  const grid: GridMap = {};
-  for (const [key, value] of Object.entries(hash)) {
-    const n = Number(value);
-    if (parseCellKey(key) && Number.isFinite(n) && n > 0) grid[key] = n;
+export const START_FOOD = 6;
+export const START_POWER = 6;
+export const START_HEALTH = 10;
+export const START_SCRAP = 2;
+export const STAT_MIN = 0;
+export const STAT_MAX = 10;
+
+export const MAX_CRATES_PER_DAY = 3;
+export const TROJAN_SCRAP_COST = 2;
+export const REAL_CRATE_COST = 2;
+export const REAL_CRATE_BONUS = 1;
+export const CURE_HEALTH = 5;
+export const WARDEN_MIN_ACTIONS = 3;
+export const TRUST_LB_MIN_EVENTS = 3;
+
+export type DisasterId =
+  | 'blackout'
+  | 'zombie'
+  | 'nuclear'
+  | 'civil_war'
+  | 'ai_uprising';
+
+export const DISASTER_IDS: readonly DisasterId[] = [
+  'blackout',
+  'zombie',
+  'nuclear',
+  'civil_war',
+  'ai_uprising',
+];
+
+export type DisasterMeta = {
+  id: DisasterId;
+  name: string;
+  accent: string;
+  shortIntro: string;
+  summary: string;
+  hints: readonly [string, string, string];
+};
+
+export const DISASTERS: Record<DisasterId, DisasterMeta> = {
+  blackout: {
+    id: 'blackout',
+    name: 'Blackout',
+    accent: '#ffd23f',
+    shortIntro: 'The grid dies before dawn.',
+    summary: '-3 Power across every bunker.',
+    hints: [
+      'The grid hums wrong tonight…',
+      'Substation lights are flickering across the city.',
+      'Hold onto your batteries before dark.',
+    ],
+  },
+  zombie: {
+    id: 'zombie',
+    name: 'Zombie Outbreak',
+    accent: '#4ade80',
+    shortIntro: 'Something is scratching at the hatch.',
+    summary: '-3 Health unless Power >= 3 keeps the fences hot.',
+    hints: [
+      'Footsteps are dragging past the outer fence…',
+      'Keep the floodlights humming or lock the doors.',
+      'They only push through when the wire goes cold.',
+    ],
+  },
+  nuclear: {
+    id: 'nuclear',
+    name: 'Nuclear Winter',
+    accent: '#60a5fa',
+    shortIntro: 'Ash falls thick and silent.',
+    summary: '-3 Food and -1 Power to wait out the freeze.',
+    hints: [
+      'Gray snow is drifting across the vents…',
+      'The temperature just fell twenty degrees.',
+      'Rations will matter more than wire tonight.',
+    ],
+  },
+  civil_war: {
+    id: 'civil_war',
+    name: 'Civil War',
+    accent: '#fb7185',
+    shortIntro: 'Rival scavengers roam the blocks.',
+    summary: '-2 Food; Trojans opened today steal double.',
+    hints: [
+      'Sirens and flares on the east ridge…',
+      'Neighbors are raiding supply drops tonight.',
+      'Trust nobody leaving boxes on your porch.',
+    ],
+  },
+  ai_uprising: {
+    id: 'ai_uprising',
+    name: 'AI Uprising',
+    accent: '#c084fc',
+    shortIntro: 'Automated drones jam every frequency.',
+    summary: 'Scans jam 50% of the time today; -2 Power.',
+    hints: [
+      'Static is looping our own callsigns back at us…',
+      'Scanner dishes are spinning on their own.',
+      'Expect interference and heavy drain tonight.',
+    ],
+  },
+};
+
+export const isDisasterId = (v: unknown): v is DisasterId =>
+  v === 'blackout' ||
+  v === 'zombie' ||
+  v === 'nuclear' ||
+  v === 'civil_war' ||
+  v === 'ai_uprising';
+
+export type LawId =
+  | 'free_scans'
+  | 'double_trojan_cost'
+  | 'friends_only'
+  | 'scavenge_plus_one'
+  | 'hide_low_trust'
+  | 'real_crate_heals';
+
+export const LAW_IDS: readonly LawId[] = [
+  'free_scans',
+  'double_trojan_cost',
+  'friends_only',
+  'scavenge_plus_one',
+  'hide_low_trust',
+  'real_crate_heals',
+];
+
+export type LawMeta = {
+  id: LawId;
+  title: string;
+  description: string;
+};
+
+export const LAWS: Record<LawId, LawMeta> = {
+  free_scans: {
+    id: 'free_scans',
+    title: 'Open Scanners',
+    description: 'Scans are free today.',
+  },
+  double_trojan_cost: {
+    id: 'double_trojan_cost',
+    title: 'Scrap Tax',
+    description: 'Trojans cost double Scrap today.',
+  },
+  friends_only: {
+    id: 'friends_only',
+    title: 'Closed Borders',
+    description: 'Random deliveries suspended (friends only).',
+  },
+  scavenge_plus_one: {
+    id: 'scavenge_plus_one',
+    title: 'Supply Surge',
+    description: 'Scavenging yields +1 extra supply.',
+  },
+  hide_low_trust: {
+    id: 'hide_low_trust',
+    title: 'Signal Filter',
+    description: 'Broadcasts under 50% Trust are hidden.',
+  },
+  real_crate_heals: {
+    id: 'real_crate_heals',
+    title: 'Field Aid',
+    description: 'Opening a real crate also heals +1 Health.',
+  },
+};
+
+export const isLawId = (v: unknown): v is LawId =>
+  v === 'free_scans' ||
+  v === 'double_trojan_cost' ||
+  v === 'friends_only' ||
+  v === 'scavenge_plus_one' ||
+  v === 'hide_low_trust' ||
+  v === 'real_crate_heals';
+
+export type ScavengeSiteId = 'pharmacy' | 'mall' | 'military';
+
+export const SCAVENGE_SITE_IDS: readonly ScavengeSiteId[] = [
+  'pharmacy',
+  'mall',
+  'military',
+];
+
+export type ScavengeSiteMeta = {
+  id: ScavengeSiteId;
+  name: string;
+  tagline: string;
+  riskLabel: string;
+};
+
+export const SCAVENGE_SITES: Record<ScavengeSiteId, ScavengeSiteMeta> = {
+  pharmacy: {
+    id: 'pharmacy',
+    name: 'Pharmacy',
+    tagline: '+2 Food or +2 Power',
+    riskLabel: 'Safe',
+  },
+  mall: {
+    id: 'mall',
+    name: 'Dead Mall',
+    tagline: '+3 Food/Power, +1 Scrap',
+    riskLabel: '20% chance -2 Health',
+  },
+  military: {
+    id: 'military',
+    name: 'Military Base',
+    tagline: '+5 Food/Power, +2 Scrap',
+    riskLabel: '45% chance -4 Health',
+  },
+};
+
+export const isScavengeSiteId = (v: unknown): v is ScavengeSiteId =>
+  v === 'pharmacy' || v === 'mall' || v === 'military';
+
+export type CrateKind = 'real' | 'trojan';
+export type CrateResource = 'food' | 'power';
+export type CrateState = 'waiting' | 'opened' | 'burned';
+
+export const isCrateKind = (v: unknown): v is CrateKind =>
+  v === 'real' || v === 'trojan';
+
+export const isCrateResource = (v: unknown): v is CrateResource =>
+  v === 'food' || v === 'power';
+
+export const isCrateState = (v: unknown): v is CrateState =>
+  v === 'waiting' || v === 'opened' || v === 'burned';
+
+export type ClaimId =
+  | 'tonight_blackout'
+  | 'tonight_zombie'
+  | 'tonight_nuclear'
+  | 'tonight_civil_war'
+  | 'tonight_ai_uprising'
+  | 'not_blackout'
+  | 'not_zombie'
+  | 'not_nuclear'
+  | 'not_civil_war'
+  | 'not_ai_uprising'
+  | 'stock_food'
+  | 'stock_power'
+  | 'barricade_health';
+
+export const CLAIM_IDS: readonly ClaimId[] = [
+  'tonight_blackout',
+  'tonight_zombie',
+  'tonight_nuclear',
+  'tonight_civil_war',
+  'tonight_ai_uprising',
+  'not_blackout',
+  'not_zombie',
+  'not_nuclear',
+  'not_civil_war',
+  'not_ai_uprising',
+  'stock_food',
+  'stock_power',
+  'barricade_health',
+];
+
+export type ClaimMeta = {
+  id: ClaimId;
+  text: string;
+};
+
+export const CLAIMS: Record<ClaimId, ClaimMeta> = {
+  tonight_blackout: { id: 'tonight_blackout', text: 'Tonight is Blackout' },
+  tonight_zombie: { id: 'tonight_zombie', text: 'Tonight is Zombie Outbreak' },
+  tonight_nuclear: { id: 'tonight_nuclear', text: 'Tonight is Nuclear Winter' },
+  tonight_civil_war: { id: 'tonight_civil_war', text: 'Tonight is Civil War' },
+  tonight_ai_uprising: {
+    id: 'tonight_ai_uprising',
+    text: 'Tonight is AI Uprising',
+  },
+  not_blackout: { id: 'not_blackout', text: 'Tonight is NOT Blackout' },
+  not_zombie: { id: 'not_zombie', text: 'Tonight is NOT Zombie Outbreak' },
+  not_nuclear: { id: 'not_nuclear', text: 'Tonight is NOT Nuclear Winter' },
+  not_civil_war: { id: 'not_civil_war', text: 'Tonight is NOT Civil War' },
+  not_ai_uprising: {
+    id: 'not_ai_uprising',
+    text: 'Tonight is NOT AI Uprising',
+  },
+  stock_food: { id: 'stock_food', text: 'Stock up on Food' },
+  stock_power: { id: 'stock_power', text: 'Stock up on Power' },
+  barricade_health: {
+    id: 'barricade_health',
+    text: 'Barricade up: Health hits tonight',
+  },
+};
+
+export const isClaimId = (v: unknown): v is ClaimId =>
+  v === 'tonight_blackout' ||
+  v === 'tonight_zombie' ||
+  v === 'tonight_nuclear' ||
+  v === 'tonight_civil_war' ||
+  v === 'tonight_ai_uprising' ||
+  v === 'not_blackout' ||
+  v === 'not_zombie' ||
+  v === 'not_nuclear' ||
+  v === 'not_civil_war' ||
+  v === 'not_ai_uprising' ||
+  v === 'stock_food' ||
+  v === 'stock_power' ||
+  v === 'barricade_health';
+
+export const isClaimTrue = (claim: ClaimId, disaster: DisasterId): boolean => {
+  switch (claim) {
+    case 'tonight_blackout':
+      return disaster === 'blackout';
+    case 'tonight_zombie':
+      return disaster === 'zombie';
+    case 'tonight_nuclear':
+      return disaster === 'nuclear';
+    case 'tonight_civil_war':
+      return disaster === 'civil_war';
+    case 'tonight_ai_uprising':
+      return disaster === 'ai_uprising';
+    case 'not_blackout':
+      return disaster !== 'blackout';
+    case 'not_zombie':
+      return disaster !== 'zombie';
+    case 'not_nuclear':
+      return disaster !== 'nuclear';
+    case 'not_civil_war':
+      return disaster !== 'civil_war';
+    case 'not_ai_uprising':
+      return disaster !== 'ai_uprising';
+    case 'stock_food':
+      return disaster === 'nuclear' || disaster === 'civil_war';
+    case 'stock_power':
+      return (
+        disaster === 'blackout' ||
+        disaster === 'nuclear' ||
+        disaster === 'ai_uprising' ||
+        disaster === 'zombie'
+      );
+    case 'barricade_health':
+      return disaster === 'zombie';
   }
-  return grid;
 };
 
-export const gridToCells = (grid: GridMap): GridCell[] => {
-  const cells: GridCell[] = [];
-  for (const [key, count] of Object.entries(grid)) {
-    const c = parseCellKey(key);
-    if (c) cells.push([c[0], c[1], count]);
-  }
-  return cells;
-};
+/** Laplace-smoothed public trust percentage (starts at 50%). */
+export const trustPercent = (good: number, total: number): number =>
+  Math.round(((good + 1) / (total + 2)) * 100);
 
-export const totalTaps = (grid: GridMap): number =>
-  Object.values(grid).reduce((a, b) => a + b, 0);
-
-/** Taps in the (2*RADIUS+1)^2 neighbourhood around (cx, cy). */
-export const neighbourhood = (
-  grid: GridMap,
-  cx: number,
-  cy: number
-): number => {
-  let sum = 0;
-  for (let dx = -RADIUS; dx <= RADIUS; dx++) {
-    for (let dy = -RADIUS; dy <= RADIUS; dy++) {
-      sum += grid[cellKey(cx + dx, cy + dy)] ?? 0;
-    }
-  }
-  return sum;
-};
-
-export type Hotspot = { cx: number; cy: number; count: number };
-
-/**
- * Highest neighbourhood count anywhere in the grid.
- * Each tapped cell spreads its count to its neighbours; the busiest
- * accumulator is the hottest spot. Handles crowds split across hotspots.
- */
-export const hottest = (grid: GridMap): Hotspot => {
-  const acc = new Map<number, number>();
-  let best: Hotspot = { cx: 0, cy: 0, count: 0 };
-  for (const [key, count] of Object.entries(grid)) {
-    const c = parseCellKey(key);
-    if (!c) continue;
-    for (let dx = -RADIUS; dx <= RADIUS; dx++) {
-      for (let dy = -RADIUS; dy <= RADIUS; dy++) {
-        const x = c[0] + dx;
-        const y = c[1] + dy;
-        if (x < 0 || y < 0 || x >= GRID || y >= GRID) continue;
-        const id = y * GRID + x;
-        const v = (acc.get(id) ?? 0) + count;
-        acc.set(id, v);
-        if (v > best.count) best = { cx: x, cy: y, count: v };
-      }
-    }
-  }
-  return best;
-};
-
-/** 0-100: your neighbourhood vs the hottest neighbourhood. */
-export const promptScore = (grid: GridMap, cx: number, cy: number): number => {
-  const max = hottest(grid).count;
-  if (max === 0) return 0;
-  return Math.round((neighbourhood(grid, cx, cy) / max) * 100);
-};
-
-export const npcPercent = (scores: number[]): number =>
-  scores.length === 0
-    ? 0
-    : Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
-
-export type Label = 'NPC' | 'Blends in' | 'Side quest' | 'Main Character';
-
-export const labelFor = (npc: number): Label => {
-  if (npc >= 80) return 'NPC';
-  if (npc >= 50) return 'Blends in';
-  if (npc >= 20) return 'Side quest';
-  return 'Main Character';
-};
+/** Clamps Food, Power, or Health into [0, 10]. */
+export const clampStat = (value: number): number =>
+  Math.min(STAT_MAX, Math.max(STAT_MIN, Math.trunc(value)));
 
 /** Milliseconds timestamp of the next 00:00 UTC. */
 export const nextResetAt = (now: number): number => {

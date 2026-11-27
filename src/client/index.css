@@ -2,14 +2,15 @@
 @import '@fontsource-variable/fredoka';
 
 @theme {
-  --color-bg: #1b1210;
-  --color-surface: #2a1d19;
-  --color-surface-2: #3a2924;
-  --color-ink: #fff4ea;
-  --color-muted: #c9b4a6;
-  --color-pink: #ff2e93;
-  --color-yellow: #ffd23f;
-  --color-blue: #3a7bff;
+  --color-bg: #17120e;
+  --color-surface: #251c16;
+  --color-surface-2: #362921;
+  --color-ink: #fff4e8;
+  --color-muted: #c8b5a6;
+  --color-amber: #ffbe3b;
+  --color-rust: #e86f38;
+  --color-toxic: #4ade80;
+  --color-danger: #fb5a6b;
   --font-display:
     'Fredoka Variable', 'Fredoka', ui-rounded, system-ui, sans-serif;
 }
@@ -20,7 +21,7 @@ body,
   height: 100%;
   margin: 0;
   background:
-    radial-gradient(120% 60% at 50% -10%, #3a1f1a 0%, transparent 60%),
+    radial-gradient(120% 60% at 50% -10%, #3a2315 0%, transparent 60%),
     var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-display);
@@ -37,7 +38,7 @@ body,
 
 button:focus-visible,
 [role='button']:focus-visible {
-  outline: 3px solid var(--color-yellow);
+  outline: 3px solid var(--color-amber);
   outline-offset: 3px;
 }
 
@@ -55,150 +56,25 @@ button:focus-visible,
 .btn:active {
   transform: scale(0.96);
 }
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .btn-primary {
-  background: var(--color-pink);
-  color: #1b1210;
-  box-shadow: 0 4px 0 #a3125b;
+  background: var(--color-amber);
+  color: #17120e;
+  box-shadow: 0 4px 0 #a36d12;
 }
 
-/* Progress dots */
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
+.crate-emblem {
   background: var(--color-surface-2);
-}
-.dot[data-state='done'] {
-  background: var(--color-yellow);
-}
-.dot[data-state='now'] {
-  background: var(--color-pink);
-  width: 22px;
+  color: var(--color-amber);
+  box-shadow: 0 4px 0 #110c09;
 }
 
-/* Play stage */
-.stage {
-  background: var(--color-surface);
-  cursor: pointer;
-}
-.stage[data-revealed='true'] {
-  cursor: default;
-}
-.picture,
-.picture svg {
-  width: 100%;
-  height: 100%;
-  display: block;
-}
-.picture {
-  transition: opacity 400ms ease;
-}
-.stage[data-revealed='true'] .picture {
-  opacity: 0.55;
-}
-
-/* Heat blooms outward from the player's tap */
-.bloom {
-  clip-path: circle(0% at var(--ox) var(--oy));
-  opacity: 0;
-  transition:
-    clip-path 600ms cubic-bezier(0.2, 0.7, 0.2, 1),
-    opacity 250ms ease;
-}
-.bloom[data-on='true'] {
-  clip-path: circle(150% at var(--ox) var(--oy));
-  opacity: 1;
-}
-.bloom canvas {
-  transform: scale(0.94);
-  transition: transform 700ms cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-.bloom[data-on='true'] canvas {
-  transform: scale(1);
-}
-
-/* Thumbprint marker + soft pulse */
-.thumb {
-  transform: translate(-50%, -50%);
-  width: 28px;
-  height: 28px;
-  filter: drop-shadow(0 2px 3px rgb(0 0 0 / 0.5));
-}
-.thumb::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  border: 2px solid var(--color-pink);
-  opacity: 0;
-}
-.thumb[data-pulse='true']::after {
-  animation: pulse 900ms ease-out 2;
-}
-@keyframes pulse {
-  from {
-    transform: scale(1);
-    opacity: 0.9;
-  }
-  to {
-    transform: scale(3);
-    opacity: 0;
-  }
-}
-
-/* Haptic-style shake when you land in the hottest spot */
-.stage[data-hot='true'] {
-  animation: shake 380ms ease 620ms;
-}
-@keyframes shake {
-  0%,
-  100% {
-    transform: translateX(0);
-  }
-  20% {
-    transform: translateX(-5px) rotate(-1deg);
-  }
-  40% {
-    transform: translateX(5px) rotate(1deg);
-  }
-  60% {
-    transform: translateX(-3px);
-  }
-  80% {
-    transform: translateX(3px);
-  }
-}
-
-/* Start screen: a little heatmap glow behind the logo */
-.logo-wrap {
-  position: relative;
-}
-.logo-wrap::before {
-  content: '';
-  position: absolute;
-  inset: -30px -60px;
-  background:
-    radial-gradient(
-      closest-side at 50% 32%,
-      rgb(255 46 147 / 0.45),
-      transparent
-    ),
-    radial-gradient(
-      closest-side at 32% 46%,
-      rgb(255 224 63 / 0.22),
-      transparent
-    ),
-    radial-gradient(closest-side at 70% 52%, rgb(49 87 255 / 0.3), transparent);
-  filter: blur(14px);
-  z-index: -1;
-}
-.logo-glyph {
-  animation: breathe 3.2s ease-in-out infinite;
-}
-@keyframes breathe {
-  50% {
-    transform: scale(1.05) rotate(-3deg);
-  }
+.bunker-ready {
+  background: var(--color-surface-2);
+  color: var(--color-amber);
 }
 
 /* Screen entry */
@@ -216,84 +92,34 @@ button:focus-visible,
   width: 14px;
   height: 14px;
   border-radius: 999px;
-  background: var(--color-pink);
+  background: var(--color-amber);
   animation: pulse-dot 900ms ease-in-out infinite alternate;
 }
 @keyframes pulse-dot {
   to {
     transform: scale(1.6);
-    background: var(--color-yellow);
+    background: var(--color-rust);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .logo-glyph,
   .enter,
-  .loading-dot,
-  .bloom canvas {
+  .loading-dot {
     animation: none;
-    transition: none;
-    transform: none;
   }
-  .bloom,
-  .picture,
   .btn {
     transition: none;
   }
-  .thumb[data-pulse='true']::after,
-  .stage[data-hot='true'] {
-    animation: none;
-  }
 }
 
-/* Result card */
-.npc-number {
-  font-size: 84px;
-  background: linear-gradient(180deg, var(--color-yellow), var(--color-pink));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-.label-pill {
-  padding: 6px 16px;
-  border-radius: 999px;
-  background: var(--color-surface-2);
-  font-weight: 700;
-  font-size: 18px;
-}
-.mini {
-  background: var(--color-surface);
-}
-.mini-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #fff8ee;
-  border: 1.5px solid #1b1210;
-  transform: translate(-50%, -50%);
-}
-
-/* Start + leaderboard */
-.btn-xl {
-  min-height: 60px;
-  font-size: 22px;
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-.chip,
-.streak-chip {
+.chip {
   padding: 6px 14px;
   border-radius: 999px;
   background: var(--color-surface);
   font-weight: 600;
   font-size: 14px;
 }
-.streak-chip {
-  font-size: 16px;
-  background: var(--color-surface-2);
-}
+
 .icon-btn {
   width: 44px;
   height: 44px;
@@ -304,6 +130,7 @@ button:focus-visible,
   color: var(--color-ink);
   cursor: pointer;
 }
+
 .tabs {
   display: flex;
   padding: 4px;
@@ -319,9 +146,10 @@ button:focus-visible,
   cursor: pointer;
 }
 .tab[aria-selected='true'] {
-  background: var(--color-yellow);
-  color: #1b1210;
+  background: var(--color-amber);
+  color: #17120e;
 }
+
 .lb-row {
   display: flex;
   align-items: center;
