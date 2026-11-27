@@ -63,7 +63,7 @@ Verified directly against `node_modules/@devvit/*` (stay on `0.15.4`; do not upg
 ### Milestone 6 — Night Report, Flair, Summary Comment, Leaderboards & Share
 - **Update:** `src/server/core/wrapup.ts` (batch flair + stickied drama summary comment), `src/server/routes/api.ts` (`GET /api/leaderboard`), `src/client/screens/Leaderboard.tsx`.
 - **Create:** `src/client/screens/NightReport.tsx` (shown once per day before Home, with `showShareSheet` spoiler-free share string).
-- **Done when:** Night reports, user flairs, summary comments, leaderboards, and sharing all work in `r/thumbprint_daily_dev`.
+- **Done when:** Night reports, user flairs, summary comments, leaderboards, and sharing all work in `r/care_package`.
 
 ### Milestone 7 — Visual Identity, Crate Animation & Polish
 - **Create:** `src/client/components/{DisasterArt,CrateArt}.tsx` (lightweight inline SVG/CSS art and per-disaster accent colors).
@@ -89,5 +89,5 @@ Verified directly against `node_modules/@devvit/*` (stay on `0.15.4`; do not upg
 
 1. **Final game name:** **Care Package** (`GAME_NAME` constant in `src/shared/game.ts`).
 2. **Devpost hackathon URL & judging criteria:** `https://redditgameofday2026.devpost.com/` — four equally weighted criteria: **Delightful UX**, **Polish** (launch quality, Devvit Rules compliant, self-explanatory demo post), **Reddit-like & Community-Minded** (comments, flair, streaks, community interaction), and **Fresh Recurring Content** (daily loop, variety, replayability).
-3. **Target launch subreddit:** TBD (keep copy generic; keep `thumbprint_daily_dev` for playtesting).
+3. **Target launch subreddit:** TBD (keep copy generic; use `care_package` for playtesting).
 4. **Two-player testing:** User confirmed second Reddit account will be ready for Milestone 2.

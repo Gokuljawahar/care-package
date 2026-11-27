@@ -11,7 +11,7 @@ import { keys } from '../core/keys';
  * Remove this constant and `/debug-hurt`, `/debug-infect`, `/debug-reset-actions`
  * (plus the devvit.json menu items) before publishing.
  */
-export const DEV_DEBUG_SUBREDDIT = 'thumbprint_daily_dev';
+export const DEV_DEBUG_SUBREDDIT = 'care_package';
 
 const isDevSubreddit = (): boolean =>
   context.subredditName.toLowerCase() === DEV_DEBUG_SUBREDDIT;
@@ -37,7 +37,7 @@ menu.post('/create-today', async (c) => {
   }
 });
 
-// DEV ONLY: sets moderator's Health to 1 and grants +5 Scrap in thumbprint_daily_dev.
+// DEV ONLY: sets moderator's Health to 1 and grants +5 Scrap in care_package.
 menu.post('/debug-hurt', async (c) => {
   if (!isDevSubreddit()) {
     return c.json<UiResponse>(
@@ -76,7 +76,7 @@ menu.post('/debug-hurt', async (c) => {
   }
 });
 
-// DEV ONLY: sets Health 0 and Infected immediately in thumbprint_daily_dev.
+// DEV ONLY: sets Health 0 and Infected immediately in care_package.
 menu.post('/debug-infect', async (c) => {
   if (!isDevSubreddit()) {
     return c.json<UiResponse>(
@@ -112,7 +112,7 @@ menu.post('/debug-infect', async (c) => {
   }
 });
 
-// DEV ONLY: clears caller's daily action flags and send cooldowns in thumbprint_daily_dev.
+// DEV ONLY: clears caller's daily action flags and send cooldowns in care_package.
 menu.post('/debug-reset-actions', async (c) => {
   if (!isDevSubreddit()) {
     return c.json<UiResponse>(

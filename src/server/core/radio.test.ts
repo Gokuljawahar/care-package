@@ -122,7 +122,7 @@ void test('/api/state serialized response never leaks tonight disaster id or nam
         loggedIn: true,
         username: 'survivor_a',
         nextResetAt: 1700000000000,
-        subredditName: 'thumbprint_daily_dev',
+        subredditName: 'care_package',
         todayPostUrl: null,
         warden: null,
         law: null,

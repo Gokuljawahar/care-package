@@ -28,21 +28,21 @@
       },
       {
         "label": "Debug: set my Health to 1 (+5 Scrap)",
-        "description": "DEV ONLY (thumbprint_daily_dev): sets your bunker Health to 1 and adds +5 Scrap",
+        "description": "DEV ONLY (care_package): sets your bunker Health to 1 and adds +5 Scrap",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/debug-hurt"
       },
       {
         "label": "Debug: infect me",
-        "description": "DEV ONLY (thumbprint_daily_dev): sets Health 0 and Infected",
+        "description": "DEV ONLY (care_package): sets Health 0 and Infected",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/debug-infect"
       },
       {
         "label": "Debug: reset my daily actions",
-        "description": "DEV ONLY (thumbprint_daily_dev): clears today's scavenge/send/broadcast/cooldown flags",
+        "description": "DEV ONLY (care_package): clears today's scavenge/send/broadcast/cooldown flags",
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/debug-reset-actions"
@@ -79,6 +79,6 @@
     }
   },
   "dev": {
-    "subreddit": "thumbprint_daily_dev"
+    "subreddit": "care_package"
   }
 }
