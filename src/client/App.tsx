@@ -12,6 +12,7 @@ import type { LawId } from '../shared/game';
 import { getState } from './api';
 import { Doorstep } from './screens/Doorstep';
 import { Home } from './screens/Home';
+import { HowToPlay } from './screens/HowToPlay';
 import { Leaderboard } from './screens/Leaderboard';
 import { NightReport } from './screens/NightReport';
 import { Radio } from './screens/Radio';
@@ -26,7 +27,8 @@ type Screen =
   | 'send'
   | 'radio'
   | 'warden'
-  | 'leaderboard';
+  | 'leaderboard'
+  | 'help';
 
 export const App = () => {
   const [state, setState] = useState<AppStateResponse | null>(null);
@@ -119,6 +121,18 @@ export const App = () => {
     return (
       <main className="app enter">
         <Leaderboard onBack={() => setScreen('home')} />
+      </main>
+    );
+  }
+
+  if (screen === 'help') {
+    return (
+      <main className="app enter">
+        <HowToPlay
+          day={state.day}
+          law={state.law}
+          onBack={() => setScreen('home')}
+        />
       </main>
     );
   }
@@ -232,6 +246,7 @@ export const App = () => {
         onRadio={() => setScreen('radio')}
         onWarden={() => setScreen('warden')}
         onLeaderboard={() => setScreen('leaderboard')}
+        onHelp={() => setScreen('help')}
       />
     </main>
   );

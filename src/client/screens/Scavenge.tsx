@@ -158,7 +158,7 @@ export const Scavenge = ({ initialOutcome, onComplete, onBack }: Props) => {
 
       {!outcome && (
         <p className="text-center text-[11px] text-muted">
-          Pick one location. Outcomes are rolled by the bunker server.
+          One run before dark. Riskier ruins hide more Scrap.
         </p>
       )}
     </div>

@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { navigateTo, showLoginPrompt } from '@devvit/web/client';
+import {
+  navigateTo,
+  showLoginPrompt,
+  showShareSheet,
+  showToast,
+} from '@devvit/web/client';
 import type { AppStateResponse } from '../../shared/api';
 import {
   LAWS,
@@ -20,6 +25,7 @@ type Props = {
   onRadio: () => void;
   onWarden: () => void;
   onLeaderboard: () => void;
+  onHelp: () => void;
 };
 
 export const Home = ({
@@ -30,6 +36,7 @@ export const Home = ({
   onRadio,
   onWarden,
   onLeaderboard,
+  onHelp,
 }: Props) => {
   const countdown = useCountdown(state.nextResetAt);
   const [awayDismissed, setAwayDismissed] = useState(false);
@@ -41,13 +48,22 @@ export const Home = ({
       <div className="flex h-full flex-col justify-between px-4 pt-3 pb-4">
         <div className="flex items-center justify-between gap-2">
           <span className="chip">Day {state.day} · Tonight: ???</span>
-          <button
-            className="icon-btn"
-            onClick={onLeaderboard}
-            aria-label="Leaderboard"
-          >
-            <TrophyIcon />
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              className="icon-btn"
+              onClick={onHelp}
+              aria-label="How to Play"
+            >
+              <HelpIcon />
+            </button>
+            <button
+              className="icon-btn"
+              onClick={onLeaderboard}
+              aria-label="Leaderboard"
+            >
+              <TrophyIcon />
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-col items-center text-center">
@@ -90,6 +106,29 @@ export const Home = ({
     !state.closed &&
     state.wardenLawOptions.length > 0;
   const showAway = Boolean(state.awayNotice) && !awayDismissed;
+  const allDoneToday =
+    !state.closed &&
+    checklist.scavenged &&
+    checklist.sent &&
+    checklist.broadcast &&
+    checklist.doorstepWaiting === 0;
+
+  const sharePrep = async () => {
+    const text = `${state.gameName} #${state.day} · Bunker sealed (Food ${bunker.food}, Power ${bunker.power}, Health ${bunker.health}) · Trust ${bunker.trust}%`;
+    try {
+      await showShareSheet({
+        title: `${state.gameName} #${state.day}`,
+        text,
+      });
+    } catch {
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Result copied');
+      } catch {
+        showToast('Could not open sharing');
+      }
+    }
+  };
 
   return (
     <div
@@ -98,12 +137,18 @@ export const Home = ({
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="chip flex items-center gap-1.5 truncate">
-          <DisasterArt variant="unknown" size={18} />
-          <span>Day {state.day} · Tonight: ???</span>
+        <span className="chip flex min-w-0 items-center gap-1.5 px-2.5 py-1 text-xs">
+          <DisasterArt variant="unknown" size={16} />
+          <span className="truncate">Day {state.day} · Tonight: ???</span>
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="chip tabular-nums">{countdown}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <button
+            className="icon-btn"
+            onClick={onHelp}
+            aria-label="How to Play"
+          >
+            <HelpIcon />
+          </button>
           <button
             className="icon-btn"
             onClick={onLeaderboard}
@@ -148,16 +193,30 @@ export const Home = ({
         </button>
       )}
 
-      <div className="flex flex-col gap-0.5 text-center text-[11px] font-semibold text-muted">
-        <p className="truncate">
+      {allDoneToday ? (
+        <div className="panel real-panel flex items-center justify-between gap-2 px-3 py-1.5">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-toxic">
+              ✔ Bunker sealed for tonight
+            </p>
+            <p className="truncate text-[11px] text-muted">
+              Disaster hits in {countdown} · Discuss below
+            </p>
+          </div>
+          <button
+            className="min-h-[44px] shrink-0 cursor-pointer rounded-full bg-amber px-3.5 text-xs font-bold text-bg"
+            onClick={() => void sharePrep()}
+          >
+            Share
+          </button>
+        </div>
+      ) : (
+        <p className="truncate text-center text-[11px] font-semibold text-muted">
           {state.warden
-            ? `Warden: u/${state.warden.username} (${state.warden.trust}%)${lawMeta ? ` · ${lawMeta.title}` : ''}`
-            : `📻 ${ticker}`}
+            ? `⏳ ${countdown} · Warden u/${state.warden.username}${lawMeta ? ` · ${lawMeta.title}` : ''}`
+            : `⏳ ${countdown} · 📻 ${ticker}`}
         </p>
-        <p className="truncate text-ink/90">
-          {`Scavenge ${checklist.scavenged ? '✔' : '✗'} · Doorstep ${checklist.doorstepWaiting} waiting · Send ${checklist.sent ? '✔' : '✗'} · Radio ${checklist.broadcast ? '✔' : '✗'}`}
-        </p>
-      </div>
+      )}
 
       {showWardenPick && (
         <button className="btn btn-primary w-full" onClick={onWarden}>
@@ -190,10 +249,25 @@ export const Home = ({
             </span>
           </button>
 
-          <button className="action-card" onClick={onDoorstep}>
-            <span className="text-sm font-bold">Doorstep</span>
-            <span className="text-[11px] text-muted">
-              {checklist.doorstepWaiting} waiting
+          <button
+            className="action-card"
+            data-alert={checklist.doorstepWaiting > 0 ? 'true' : 'false'}
+            onClick={onDoorstep}
+          >
+            <div className="flex w-full items-center justify-between gap-1">
+              <span className="text-sm font-bold">Doorstep</span>
+              {checklist.doorstepWaiting > 0 && (
+                <span className="pill text-amber">
+                  {checklist.doorstepWaiting}
+                </span>
+              )}
+            </div>
+            <span
+              className={`text-[11px] ${checklist.doorstepWaiting > 0 ? 'font-semibold text-amber' : 'text-muted'}`}
+            >
+              {checklist.doorstepWaiting > 0
+                ? `${checklist.doorstepWaiting} ${checklist.doorstepWaiting === 1 ? 'crate' : 'crates'} waiting`
+                : 'Porch clear'}
             </span>
           </button>
 
@@ -215,7 +289,9 @@ export const Home = ({
           >
             <span className="text-sm font-bold">Radio</span>
             <span className="text-[11px] text-muted">
-              {radioFeed.length} {radioFeed.length === 1 ? 'signal' : 'signals'}
+              {checklist.broadcast
+                ? '✔ Signal sent'
+                : `${radioFeed.length} ${radioFeed.length === 1 ? 'signal' : 'signals'}`}
             </span>
           </button>
         </div>
@@ -223,6 +299,27 @@ export const Home = ({
     </div>
   );
 };
+
+const HelpIcon = () => (
+  <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+    <circle
+      cx="12"
+      cy="12"
+      r="9"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    />
+    <path
+      d="M9.7 9.3a2.4 2.4 0 0 1 4.6.9c0 1.5-2.3 1.9-2.3 3.3m0 3h.01"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 const TrophyIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
