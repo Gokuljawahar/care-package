@@ -72,13 +72,18 @@ export const Doorstep = ({
     }
   };
 
+  const senderLabel = (name: string, isNpc: boolean) =>
+    isNpc ? name : `u/${name}`;
+
   const handleBurn = async (crate: DoorstepCrate) => {
     if (pending) return;
     setPending(true);
     setError(null);
     try {
       const res = await postCrateBurn({ crateId: crate.id });
-      setBurnedMsg(`Burned crate from u/${crate.fromUsername}. No Trust change.`);
+      setBurnedMsg(
+        `Burned crate from ${senderLabel(crate.fromUsername, crate.fromIsNpc)}. No Trust change.`
+      );
       onBurned(res);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Could not burn crate');
@@ -119,7 +124,8 @@ export const Doorstep = ({
                   : 'Care Package Opened'}
               </span>
               <span className="pill">
-                u/{outcome.fromUsername} · {outcome.fromTrust}%
+                {senderLabel(outcome.fromUsername, outcome.fromIsNpc)} ·{' '}
+                {outcome.fromTrust}%
               </span>
             </div>
 
@@ -230,9 +236,18 @@ export const Doorstep = ({
           <div>
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="truncate text-base font-bold">
-                  From u/{activeCrate.fromUsername}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="truncate text-base font-bold">
+                    From{' '}
+                    {senderLabel(
+                      activeCrate.fromUsername,
+                      activeCrate.fromIsNpc
+                    )}
+                  </p>
+                  {activeCrate.fromIsNpc && (
+                    <span className="pill text-amber">NPC</span>
+                  )}
+                </div>
                 <p className="text-xs text-muted">
                   Trust {activeCrate.fromTrust}% · Sent Day {activeCrate.day}
                 </p>

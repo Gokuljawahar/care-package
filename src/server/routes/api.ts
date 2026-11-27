@@ -33,12 +33,14 @@ import {
 } from '../core/crates';
 import {
   ensureDay,
+  getDayDisaster,
   getDayLaw,
   getDayPostId,
   getDayWarden,
   isDayClosed,
 } from '../core/day';
 import { keys } from '../core/keys';
+import { readRadioFeedPreview } from '../core/npcs';
 import { executeScavenge } from '../core/scavenge';
 
 export const api = new Hono();
@@ -140,6 +142,7 @@ api.get('/state', async (c) => {
     const day = await resolveDay();
     const current = await ensureDay();
     const { userId, username } = context;
+    const disaster = (await getDayDisaster(day)) ?? 'blackout';
 
     const [
       closed,
@@ -150,6 +153,7 @@ api.get('/state', async (c) => {
       checklistData,
       crates,
       lastSent,
+      radioFeed,
     ] = await Promise.all([
       isDayClosed(day),
       loadWardenBanner(day),
@@ -164,6 +168,7 @@ api.get('/state', async (c) => {
           }),
       userId ? readDoorstep(userId) : Promise.resolve([]),
       userId ? readLastSent(day, userId) : Promise.resolve(null),
+      readRadioFeedPreview(day, disaster),
     ]);
 
     return c.json<AppStateResponse>({
@@ -186,6 +191,7 @@ api.get('/state', async (c) => {
       lastScavenge: checklistData.lastScavenge,
       crates,
       lastSent,
+      radioFeed,
     });
   } catch (error) {
     console.error('GET /api/state failed', error);

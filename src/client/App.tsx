@@ -11,10 +11,17 @@ import { getState } from './api';
 import { Doorstep } from './screens/Doorstep';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
+import { Radio } from './screens/Radio';
 import { Scavenge } from './screens/Scavenge';
 import { Send } from './screens/Send';
 
-type Screen = 'home' | 'scavenge' | 'doorstep' | 'send' | 'leaderboard';
+type Screen =
+  | 'home'
+  | 'scavenge'
+  | 'doorstep'
+  | 'send'
+  | 'radio'
+  | 'leaderboard';
 
 export const App = () => {
   const [state, setState] = useState<AppStateResponse | null>(null);
@@ -145,6 +152,18 @@ export const App = () => {
     );
   }
 
+  if (screen === 'radio') {
+    return (
+      <main className="app enter">
+        <Radio
+          day={state.day}
+          feed={state.radioFeed}
+          onBack={() => setScreen('home')}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="app enter">
       <Home
@@ -155,6 +174,7 @@ export const App = () => {
           setSendPrefill(null);
           setScreen('send');
         }}
+        onRadio={() => setScreen('radio')}
         onLeaderboard={() => setScreen('leaderboard')}
       />
     </main>

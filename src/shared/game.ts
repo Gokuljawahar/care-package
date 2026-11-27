@@ -636,3 +636,120 @@ export const nextResetAt = (now: number): number => {
   const d = new Date(now);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
 };
+
+export type NpcProfile = {
+  id: string;
+  name: string;
+  trust: number;
+  role: 'helper' | 'trickster';
+};
+
+export const NPCS: readonly NpcProfile[] = [
+  {
+    id: 'npc_radio_guy',
+    name: '[NPC] Old Radio Guy',
+    trust: 78,
+    role: 'helper',
+  },
+  {
+    id: 'npc_med_drone',
+    name: '[NPC] Med-Bay Drone',
+    trust: 85,
+    role: 'helper',
+  },
+  {
+    id: 'npc_scrap_kid',
+    name: '[NPC] Scrap Kid',
+    trust: 61,
+    role: 'helper',
+  },
+  {
+    id: 'npc_mall_rat',
+    name: '[NPC] Mall Rat',
+    trust: 38,
+    role: 'trickster',
+  },
+  {
+    id: 'npc_alley_trader',
+    name: '[NPC] Alley Trader',
+    trust: 42,
+    role: 'trickster',
+  },
+];
+
+export const isNpcId = (id: string): boolean => id.startsWith('npc_');
+
+export const npcById = (id: string): NpcProfile | undefined =>
+  NPCS.find((n) => n.id === id);
+
+/** Picks 1 deterministic true-but-vague hint for today's disaster. */
+export const officialSignalForDay = (
+  day: number,
+  disaster: DisasterId
+): string => {
+  const hints = DISASTERS[disaster].hints;
+  const idx = (Math.max(1, day) - 1) % hints.length;
+  return hints[idx] ?? hints[0];
+};
+
+export type NpcCrateSpec = {
+  npc: NpcProfile;
+  kind: CrateKind;
+  resource: CrateResource;
+};
+
+/** Day-1 starter doorstep: 1 real crate from a helper NPC + 1 Trojan from a trickster NPC. */
+export const pickDayOneNpcCrateSpecs = (
+  rng: () => number = Math.random
+): readonly [NpcCrateSpec, NpcCrateSpec] => {
+  const helpers = NPCS.filter((n) => n.role === 'helper');
+  const tricksters = NPCS.filter((n) => n.role === 'trickster');
+  const helper =
+    helpers[Math.floor(rng() * helpers.length)] ?? NPCS[0]!;
+  const trickster =
+    tricksters[Math.floor(rng() * tricksters.length)] ?? NPCS[3]!;
+  const realResource: CrateResource = rng() < 0.5 ? 'food' : 'power';
+  return [
+    { npc: helper, kind: 'real', resource: realResource },
+    { npc: trickster, kind: 'trojan', resource: 'food' },
+  ];
+};
+
+export type NpcBroadcastSpec = {
+  npcId: string;
+  claimId: ClaimId;
+};
+
+/** Generates 1-2 mostly-true daily NPC broadcasts so the Radio is never empty. */
+export const pickNpcBroadcastSpecs = (
+  day: number,
+  disaster: DisasterId,
+  rng: () => number = Math.random
+): readonly NpcBroadcastSpec[] => {
+  const trueClaims = CLAIM_IDS.filter((id) => isClaimTrue(id, disaster));
+  const falseClaims = CLAIM_IDS.filter((id) => !isClaimTrue(id, disaster));
+  const count = day === 1 ? 2 : rng() < 0.3 ? 1 : 2;
+
+  const helpers = NPCS.filter((n) => n.role === 'helper');
+  const firstNpc = helpers[Math.floor(rng() * helpers.length)] ?? NPCS[0]!;
+  const firstClaim =
+    trueClaims[Math.floor(rng() * trueClaims.length)] ?? 'stock_power';
+
+  if (count === 1) {
+    return [{ npcId: firstNpc.id, claimId: firstClaim }];
+  }
+
+  const others = NPCS.filter((n) => n.id !== firstNpc.id);
+  const secondNpc = others[Math.floor(rng() * others.length)] ?? NPCS[3]!;
+  const tellTruth = rng() < 0.7;
+  const pool = tellTruth ? trueClaims : falseClaims;
+  const filtered = pool.filter((c) => c !== firstClaim);
+  const pickPool = filtered.length > 0 ? filtered : pool;
+  const secondClaim =
+    pickPool[Math.floor(rng() * pickPool.length)] ?? firstClaim;
+
+  return [
+    { npcId: firstNpc.id, claimId: firstClaim },
+    { npcId: secondNpc.id, claimId: secondClaim },
+  ];
+};

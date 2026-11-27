@@ -1,4 +1,8 @@
 import { redis } from '@devvit/web/server';
+import {
+  atomicUpdateHash,
+  type HashUpdateDecision,
+} from '../../shared/atomic';
 import type {
   BunkerState,
   DayChecklist,
@@ -14,6 +18,7 @@ import {
   trustPercent,
 } from '../../shared/game';
 import { keys } from './keys';
+import { seedNewPlayerNpcCrates } from './npcs';
 
 export type PlayerRecord = {
   food: number;
@@ -37,7 +42,7 @@ const parseIntOr = (v: string | undefined, fallback: number): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
-const parseRecord = (
+export const parseRecord = (
   h: Record<string, string>,
   day: number
 ): PlayerRecord => ({
@@ -69,8 +74,8 @@ export const toBunkerState = (record: PlayerRecord): BunkerState => ({
 });
 
 /**
- * Loads the player's bunker, atomically creating starting stats on first visit
- * and indexing their username and membership in `cp:players:all`.
+ * Loads the player's bunker, atomically creating starting stats on first visit,
+ * indexing their username, and seeding their 2 Day-1 NPC crates.
  */
 export const ensureBunker = async (
   userId: string,
@@ -103,6 +108,11 @@ export const ensureBunker = async (
     h = await redis.hGetAll(playerKey);
   }
 
+  if (h['npcCratesSeeded'] !== '1') {
+    await seedNewPlayerNpcCrates(userId, day);
+    h = await redis.hGetAll(playerKey);
+  }
+
   if (username) {
     await Promise.all([
       redis.hSet(keys.usernames(), { [userId]: username }),
@@ -115,24 +125,17 @@ export const ensureBunker = async (
   return parseRecord(h, day);
 };
 
-export const saveBunkerStats = async (
+/**
+ * Performs an optimistic-locking WATCH/MULTI/EXEC update on `cp:player:{userId}`.
+ */
+export const updatePlayerAtomic = async <T>(
   userId: string,
-  stats: {
-    food: number;
-    power: number;
-    health: number;
-    scrap: number;
-    infected: boolean;
-  }
-): Promise<void> => {
-  await redis.hSet(keys.player(userId), {
-    food: String(clampStat(stats.food)),
-    power: String(clampStat(stats.power)),
-    health: String(clampStat(stats.health)),
-    scrap: String(Math.max(0, Math.trunc(stats.scrap))),
-    infected: stats.infected ? '1' : '0',
-  });
-};
+  day: number,
+  updater: (record: PlayerRecord) => HashUpdateDecision<T>
+): Promise<T> =>
+  atomicUpdateHash(redis, keys.player(userId), (h) =>
+    updater(parseRecord(h, day))
+  );
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((item) => typeof item === 'string');

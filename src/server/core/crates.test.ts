@@ -4,6 +4,7 @@ import {
   resolveCrateOpen,
   scanCostFor,
   trojanCostFor,
+  trustPercent,
 } from '../../shared/game.ts';
 
 void test('real crate gives +3 to survivor and +1 health with real_crate_heals law', () => {
@@ -103,4 +104,40 @@ void test('law modifiers apply to scan and trojan costs', () => {
   assert.equal(trojanCostFor(false, undefined), 2);
   assert.equal(trojanCostFor(false, 'double_trojan_cost'), 4);
   assert.equal(trojanCostFor(true, 'double_trojan_cost'), 0);
+});
+
+void test('two-account Trust sequence: B opens A real (67%), A opens B trojan (33%)', () => {
+  let aGood = 0;
+  let aTotal = 0;
+  let bGood = 0;
+  let bTotal = 0;
+
+  assert.equal(trustPercent(aGood, aTotal), 50);
+  assert.equal(trustPercent(bGood, bTotal), 50);
+
+  // Step 1: B opens A's real crate -> A becomes (1+1)/(1+2) = 67%, B stays 50%.
+  const r1 = resolveCrateOpen({
+    kind: 'real',
+    resource: 'food',
+    recipient: { food: 6, power: 6, health: 10, infected: false },
+    disaster: 'blackout',
+    law: undefined,
+  });
+  aGood += r1.senderTrustGoodDelta;
+  aTotal += r1.senderTrustTotalDelta;
+  assert.equal(trustPercent(aGood, aTotal), 67);
+  assert.equal(trustPercent(bGood, bTotal), 50);
+
+  // Step 2: A opens B's Trojan -> B becomes (0+1)/(1+2) = 33%, A stays 67%.
+  const r2 = resolveCrateOpen({
+    kind: 'trojan',
+    resource: 'food',
+    recipient: { food: 4, power: 6, health: 10, infected: false },
+    disaster: 'blackout',
+    law: undefined,
+  });
+  bGood += r2.senderTrustGoodDelta;
+  bTotal += r2.senderTrustTotalDelta;
+  assert.equal(trustPercent(bGood, bTotal), 33);
+  assert.equal(trustPercent(aGood, aTotal), 67);
 });

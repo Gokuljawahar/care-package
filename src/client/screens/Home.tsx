@@ -1,4 +1,4 @@
-import { navigateTo, showLoginPrompt, showToast } from '@devvit/web/client';
+import { navigateTo, showLoginPrompt } from '@devvit/web/client';
 import type { AppStateResponse } from '../../shared/api';
 import {
   LAWS,
@@ -14,6 +14,7 @@ type Props = {
   onScavenge: () => void;
   onDoorstep: () => void;
   onSend: () => void;
+  onRadio: () => void;
   onLeaderboard: () => void;
 };
 
@@ -22,6 +23,7 @@ export const Home = ({
   onScavenge,
   onDoorstep,
   onSend,
+  onRadio,
   onLeaderboard,
 }: Props) => {
   const countdown = useCountdown(state.nextResetAt);
@@ -73,7 +75,8 @@ export const Home = ({
     );
   }
 
-  const { checklist } = state;
+  const { checklist, radioFeed } = state;
+  const ticker = radioFeed[0]?.text ?? 'Radio silent';
 
   return (
     <div className="flex h-full flex-col justify-between gap-2 px-4 pt-2.5 pb-3">
@@ -110,11 +113,11 @@ export const Home = ({
         <StatBar label="Health" value={bunker.health} tone="health" />
       </section>
 
-      <div className="flex flex-col gap-1 text-center text-[11px] font-semibold text-muted">
+      <div className="flex flex-col gap-0.5 text-center text-[11px] font-semibold text-muted">
         <p className="truncate">
           {state.warden
             ? `Warden: u/${state.warden.username} (${state.warden.trust}%)${lawMeta ? ` · ${lawMeta.title}` : ''}`
-            : 'No Warden yet · Survive tonight to claim authority'}
+            : `📻 ${ticker}`}
         </p>
         <p className="truncate text-ink/90">
           {`Scavenge ${checklist.scavenged ? '✔' : '✗'} · Doorstep ${checklist.doorstepWaiting} waiting · Send ${checklist.sent ? '✔' : '✗'} · Radio ${checklist.broadcast ? '✔' : '✗'}`}
@@ -167,11 +170,11 @@ export const Home = ({
           <button
             className="action-card"
             data-done={checklist.broadcast ? 'true' : 'false'}
-            onClick={() => showToast('Radio broadcasts unlock in Milestone 4')}
+            onClick={onRadio}
           >
             <span className="text-sm font-bold">Radio</span>
             <span className="text-[11px] text-muted">
-              {checklist.broadcast ? '✔ Signal sent' : 'Check signals'}
+              {radioFeed.length} {radioFeed.length === 1 ? 'signal' : 'signals'}
             </span>
           </button>
         </div>

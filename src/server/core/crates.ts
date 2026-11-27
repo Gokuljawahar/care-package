@@ -1,6 +1,5 @@
 import { redis } from '@devvit/web/server';
 import type {
-  BunkerState,
   CrateBurnResponse,
   CrateOpenOutcome,
   CrateOpenResponse,
@@ -14,6 +13,7 @@ import {
   clampStat,
   isCrateKind,
   isCrateResource,
+  isNpcId,
   MAX_CRATES_PER_DAY,
   REAL_CRATE_COST,
   resolveCrateOpen,
@@ -30,8 +30,8 @@ import {
   ensureBunker,
   readChecklist,
   recordDailyAction,
-  saveBunkerStats,
   toBunkerState,
+  updatePlayerAtomic,
 } from './bunker';
 import { getDayDisaster, getDayLaw } from './day';
 import { keys } from './keys';
@@ -135,7 +135,10 @@ export const readDoorstep = async (
       waiting
         .filter((w) => w.data['isNpc'] !== '1')
         .map((w) => w.data['from'])
-        .filter((id): id is string => Boolean(id))
+        .filter(
+          (id): id is string =>
+            typeof id === 'string' && id.length > 0 && !isNpcId(id)
+        )
     ),
   ];
 
@@ -201,7 +204,7 @@ const claimRandomRecipient = async (
     allPlayers
       .map((p) => p.member)
       .filter((id) => {
-        if (id === senderId || id === excludeId) return false;
+        if (id === senderId || id === excludeId || isNpcId(id)) return false;
         if (num(sentToMap[id]) >= day - 1) return false;
         if (num(countMap[id]) >= MAX_CRATES_PER_DAY) return false;
         return true;
@@ -276,7 +279,7 @@ export const sendCrate = async (
     const foundInit = foundId
       ? await redis.hGet(keys.player(foundId), 'initialized')
       : undefined;
-    if (!foundId || foundInit !== '1') {
+    if (!foundId || isNpcId(foundId) || foundInit !== '1') {
       return err(404, 'No survivor found with that username');
     }
     if (foundId === senderId) {
@@ -305,7 +308,7 @@ export const sendCrate = async (
       if (!overflow) {
         return err(
           409,
-          "That doorstep is full and no other survivor has room today"
+          'That doorstep is full and no other survivor has room today'
         );
       }
       recipientId = overflow.id;
@@ -322,9 +325,7 @@ export const sendCrate = async (
   }
 
   const rollbackSlot = async () => {
-    if (recipientId) {
-      await redis.hIncrBy(keys.dayCrateCount(day), recipientId, -1);
-    }
+    await redis.hIncrBy(keys.dayCrateCount(day), recipientId, -1);
   };
 
   const claimedSend = await redis.hSetNX(actionsKey, 'sent', '1');
@@ -333,93 +334,136 @@ export const sendCrate = async (
     return err(409, 'You already sent a care package today');
   }
 
-  // Re-read sender bunker after atomic claim to guard against concurrent deductions.
-  const freshSender = await ensureBunker(senderId, senderUsername, day);
-  let nextFood = freshSender.food;
-  let nextPower = freshSender.power;
-  let nextScrap = freshSender.scrap;
+  let crateCommitted = false;
+  try {
+    const deductResult = await updatePlayerAtomic<
+      | { ok: true; bunker: ReturnType<typeof toBunkerState> }
+      | { ok: false; err: CrateErr }
+    >(senderId, day, (freshSender) => {
+      if (freshSender.infected && req.kind === 'real') {
+        return {
+          commit: false,
+          result: {
+            ok: false,
+            err: err(400, 'Infected survivors can only send Trojans'),
+          },
+        };
+      }
+      let nextFood = freshSender.food;
+      let nextPower = freshSender.power;
+      let nextScrap = freshSender.scrap;
 
-  if (kind === 'real') {
-    if (resource === 'food') {
-      if (freshSender.food < REAL_CRATE_COST) {
-        await redis.hDel(actionsKey, ['sent']);
-        await rollbackSlot();
-        return err(409, `Need at least ${REAL_CRATE_COST} food to send`);
+      if (kind === 'real') {
+        if (resource === 'food') {
+          if (freshSender.food < REAL_CRATE_COST) {
+            return {
+              commit: false,
+              result: {
+                ok: false,
+                err: err(409, `Need at least ${REAL_CRATE_COST} food to send`),
+              },
+            };
+          }
+          nextFood = clampStat(freshSender.food - REAL_CRATE_COST);
+        } else {
+          if (freshSender.power < REAL_CRATE_COST) {
+            return {
+              commit: false,
+              result: {
+                ok: false,
+                err: err(409, `Need at least ${REAL_CRATE_COST} power to send`),
+              },
+            };
+          }
+          nextPower = clampStat(freshSender.power - REAL_CRATE_COST);
+        }
+      } else {
+        const cost = trojanCostFor(freshSender.infected, law);
+        if (freshSender.scrap < cost) {
+          return {
+            commit: false,
+            result: {
+              ok: false,
+              err: err(409, `Need ${cost} Scrap to rig a Trojan`),
+            },
+          };
+        }
+        nextScrap = Math.max(0, freshSender.scrap - cost);
       }
-      nextFood = clampStat(freshSender.food - REAL_CRATE_COST);
-    } else {
-      if (freshSender.power < REAL_CRATE_COST) {
-        await redis.hDel(actionsKey, ['sent']);
-        await rollbackSlot();
-        return err(409, `Need at least ${REAL_CRATE_COST} power to send`);
-      }
-      nextPower = clampStat(freshSender.power - REAL_CRATE_COST);
-    }
-  } else {
-    const cost = trojanCostFor(freshSender.infected, law);
-    if (freshSender.scrap < cost) {
+
+      return {
+        commit: true,
+        fields: {
+          food: String(nextFood),
+          power: String(nextPower),
+          scrap: String(nextScrap),
+        },
+        result: {
+          ok: true,
+          bunker: toBunkerState({
+            ...freshSender,
+            food: nextFood,
+            power: nextPower,
+            scrap: nextScrap,
+          }),
+        },
+      };
+    });
+
+    if (!deductResult.ok) {
       await redis.hDel(actionsKey, ['sent']);
       await rollbackSlot();
-      return err(409, `Need ${cost} Scrap to rig a Trojan`);
+      return deductResult.err;
     }
-    nextScrap = Math.max(0, freshSender.scrap - cost);
-  }
 
-  const seq = await redis.incrBy(keys.crateSeq(), 1);
-  const crateId = `c${day}_${seq}`;
-  const summary: SentCrateSummary = {
-    recipientUsername,
-    kind,
-    resource: kind === 'real' ? resource : null,
-    rerouted,
-  };
-
-  await Promise.all([
-    saveBunkerStats(senderId, {
-      food: nextFood,
-      power: nextPower,
-      health: freshSender.health,
-      scrap: nextScrap,
-      infected: freshSender.infected,
-    }),
-    redis.hSet(keys.crate(crateId), {
-      id: crateId,
-      from: senderId,
-      fromUsername: senderUsername ?? 'survivor',
-      fromIsNpc: '0',
-      isNpc: '0',
-      to: recipientId,
+    const seq = await redis.incrBy(keys.crateSeq(), 1);
+    const crateId = `c${day}_${seq}`;
+    const summary: SentCrateSummary = {
+      recipientUsername,
       kind,
-      resource: kind === 'real' ? resource : 'food',
-      day: String(day),
-      state: 'waiting',
-      scanned: '0',
-      scanResult: '',
-    }),
-    redis.zAdd(keys.doorstep(recipientId), { member: crateId, score: day }),
-    redis.hSet(keys.sentTo(senderId), { [recipientId]: String(day) }),
-    redis.hSet(actionsKey, {
-      sentCrateId: crateId,
-      sentSummary: JSON.stringify(summary),
-    }),
-    recordDailyAction(day, senderId),
-  ]);
+      resource: kind === 'real' ? resource : null,
+      rerouted,
+    };
 
-  const { checklist } = await readChecklist(day, senderId);
-  const bunker: BunkerState = toBunkerState({
-    ...freshSender,
-    food: nextFood,
-    power: nextPower,
-    scrap: nextScrap,
-  });
+    await Promise.all([
+      redis.hSet(keys.crate(crateId), {
+        id: crateId,
+        from: senderId,
+        fromUsername: senderUsername ?? 'survivor',
+        isNpc: '0',
+        to: recipientId,
+        kind,
+        resource: kind === 'real' ? resource : 'food',
+        day: String(day),
+        state: 'waiting',
+        scanned: '0',
+        scanResult: '',
+      }),
+      redis.zAdd(keys.doorstep(recipientId), { member: crateId, score: day }),
+      redis.hSet(keys.sentTo(senderId), { [recipientId]: String(day) }),
+      redis.hSet(actionsKey, {
+        sentCrateId: crateId,
+        sentSummary: JSON.stringify(summary),
+      }),
+      recordDailyAction(day, senderId),
+    ]);
+    crateCommitted = true;
 
-  return {
-    ok: true,
-    type: 'crate_send',
-    summary,
-    bunker,
-    checklist,
-  };
+    const { checklist } = await readChecklist(day, senderId);
+    return {
+      ok: true,
+      type: 'crate_send',
+      summary,
+      bunker: deductResult.bunker,
+      checklist,
+    };
+  } catch (error) {
+    if (!crateCommitted) {
+      await redis.hDel(actionsKey, ['sent']);
+      await rollbackSlot();
+    }
+    throw error;
+  }
 };
 
 export type ScanCrateResult =
@@ -446,68 +490,86 @@ export const scanCrate = async (
 
   const law = await getDayLaw(day);
   const powerCost = scanCostFor(law);
-  const bunker = await ensureBunker(userId, username, day);
-  if (bunker.power < powerCost) {
-    return err(409, 'Not enough Power to scan');
-  }
+  await ensureBunker(userId, username, day);
 
   const scanLock = await redis.hSetNX(crateKey, 'scanLock', '1');
   if (scanLock !== 1) {
     return err(409, 'This crate was already scanned');
   }
 
-  const freshCrate = await redis.hGetAll(crateKey);
-  if (
-    freshCrate['resolveLock'] === '1' ||
-    freshCrate['state'] !== 'waiting'
-  ) {
-    await redis.hDel(crateKey, ['scanLock']);
-    return err(409, 'This crate was already opened or burned');
+  let committed = false;
+  try {
+    const freshCrate = await redis.hGetAll(crateKey);
+    if (
+      freshCrate['resolveLock'] === '1' ||
+      freshCrate['state'] !== 'waiting'
+    ) {
+      await redis.hDel(crateKey, ['scanLock']);
+      return err(409, 'This crate was already opened or burned');
+    }
+
+    const deduct = await updatePlayerAtomic<
+      | { ok: true; bunker: ReturnType<typeof toBunkerState> }
+      | { ok: false; err: CrateErr }
+    >(userId, day, (freshBunker) => {
+      if (freshBunker.power < powerCost) {
+        return {
+          commit: false,
+          result: { ok: false, err: err(409, 'Not enough Power to scan') },
+        };
+      }
+      const nextPower = clampStat(freshBunker.power - powerCost);
+      return {
+        commit: true,
+        fields: { power: String(nextPower) },
+        result: {
+          ok: true,
+          bunker: toBunkerState({ ...freshBunker, power: nextPower }),
+        },
+      };
+    });
+
+    if (!deduct.ok) {
+      await redis.hDel(crateKey, ['scanLock']);
+      return deduct.err;
+    }
+
+    const disaster = await getDayDisaster(day);
+    const jammed = disaster === 'ai_uprising' && Math.random() < 0.5;
+    const kind: CrateKind = freshCrate['kind'] === 'real' ? 'real' : 'trojan';
+    const scanStatus: CrateScanStatus = jammed ? 'jammed' : kind;
+
+    await Promise.all([
+      redis.hSet(crateKey, {
+        scanned: jammed ? 'jammed' : '1',
+        scanResult: scanStatus,
+      }),
+      recordDailyAction(day, userId),
+    ]);
+    committed = true;
+
+    const [crates, checklistData] = await Promise.all([
+      readDoorstep(userId),
+      readChecklist(day, userId),
+    ]);
+
+    return {
+      ok: true,
+      type: 'crate_scan',
+      crateId,
+      jammed,
+      scanStatus,
+      powerCost,
+      bunker: deduct.bunker,
+      checklist: checklistData.checklist,
+      crates,
+    };
+  } catch (error) {
+    if (!committed) {
+      await redis.hDel(crateKey, ['scanLock']);
+    }
+    throw error;
   }
-
-  const freshBunker = await ensureBunker(userId, username, day);
-  if (freshBunker.power < powerCost) {
-    await redis.hDel(crateKey, ['scanLock']);
-    return err(409, 'Not enough Power to scan');
-  }
-
-  const nextPower = clampStat(freshBunker.power - powerCost);
-  const disaster = await getDayDisaster(day);
-  const jammed = disaster === 'ai_uprising' && Math.random() < 0.5;
-  const kind: CrateKind = freshCrate['kind'] === 'real' ? 'real' : 'trojan';
-  const scanStatus: CrateScanStatus = jammed ? 'jammed' : kind;
-
-  await Promise.all([
-    saveBunkerStats(userId, {
-      food: freshBunker.food,
-      power: nextPower,
-      health: freshBunker.health,
-      scrap: freshBunker.scrap,
-      infected: freshBunker.infected,
-    }),
-    redis.hSet(crateKey, {
-      scanned: jammed ? 'jammed' : '1',
-      scanResult: scanStatus,
-    }),
-    recordDailyAction(day, userId),
-  ]);
-
-  const [crates, checklistData] = await Promise.all([
-    readDoorstep(userId),
-    readChecklist(day, userId),
-  ]);
-
-  return {
-    ok: true,
-    type: 'crate_scan',
-    crateId,
-    jammed,
-    scanStatus,
-    powerCost,
-    bunker: toBunkerState({ ...freshBunker, power: nextPower }),
-    checklist: checklistData.checklist,
-    crates,
-  };
 };
 
 export type OpenCrateResult =
@@ -534,135 +596,165 @@ export const openCrate = async (
     return err(409, 'This crate was already opened or burned');
   }
 
-  const recipient = await ensureBunker(userId, username, day);
-  const [disaster, law] = await Promise.all([
-    getDayDisaster(day),
-    getDayLaw(day),
-  ]);
-
-  const kind: CrateKind = crate['kind'] === 'real' ? 'real' : 'trojan';
-  const resource: CrateResource =
-    crate['resource'] === 'power' ? 'power' : 'food';
-  const isNpc = crate['isNpc'] === '1';
-  const fromId = crate['from'] ?? '';
-
-  const resolution = resolveCrateOpen({
-    kind,
-    resource,
-    recipient: {
-      food: recipient.food,
-      power: recipient.power,
-      health: recipient.health,
-      infected: recipient.infected,
-    },
-    disaster: disaster ?? 'blackout',
-    law,
-  });
-
-  await Promise.all([
-    saveBunkerStats(userId, {
-      food: resolution.nextFood,
-      power: resolution.nextPower,
-      health: resolution.nextHealth,
-      scrap: recipient.scrap,
-      infected: resolution.nextInfected,
-    }),
-    redis.hSet(crateKey, {
-      state: 'opened',
-      openedDay: String(day),
-    }),
-    redis.zRem(keys.doorstep(userId), [crateId]),
-    recordDailyAction(day, userId),
-  ]);
-
-  let fromUsername = crate['fromUsername'] ?? 'survivor';
-  let fromTrust = num(crate['fromTrust'] ?? '50');
-
-  if (!isNpc && fromId) {
-    const senderKey = keys.player(fromId);
-    const [storedName, newGood, newTotal] = await Promise.all([
-      redis.hGet(keys.usernames(), fromId),
-      resolution.senderTrustGoodDelta > 0
-        ? redis.hIncrBy(senderKey, 'trustGood', resolution.senderTrustGoodDelta)
-        : redis.hGet(senderKey, 'trustGood').then(num),
-      resolution.senderTrustTotalDelta > 0
-        ? redis.hIncrBy(
-            senderKey,
-            'trustTotal',
-            resolution.senderTrustTotalDelta
-          )
-        : redis.hGet(senderKey, 'trustTotal').then(num),
+  let committed = false;
+  try {
+    await ensureBunker(userId, username, day);
+    const [disaster, law] = await Promise.all([
+      getDayDisaster(day),
+      getDayLaw(day),
     ]);
-    if (storedName) fromUsername = storedName;
-    fromTrust = trustPercent(newGood, newTotal);
 
-    if (newTotal >= TRUST_LB_MIN_EVENTS) {
-      await redis.zAdd(keys.lbTrust(), { member: fromId, score: fromTrust });
-    }
+    const kind: CrateKind = crate['kind'] === 'real' ? 'real' : 'trojan';
+    const resource: CrateResource =
+      crate['resource'] === 'power' ? 'power' : 'food';
+    const isNpc = crate['isNpc'] === '1';
+    const fromId = crate['from'] ?? '';
 
-    if (resolution.senderCuresDelta > 0) {
-      const cures = await redis.hIncrBy(
-        senderKey,
-        'cures',
-        resolution.senderCuresDelta
-      );
-      await Promise.all([
-        redis.zAdd(keys.lbMedic(), { member: fromId, score: cures }),
-        redis.hSet(keys.dayMedics(day), { [fromId]: '1' }),
+    const recipientUpdate = await updatePlayerAtomic(userId, day, (recipient) => {
+      const resolution = resolveCrateOpen({
+        kind,
+        resource,
+        recipient: {
+          food: recipient.food,
+          power: recipient.power,
+          health: recipient.health,
+          infected: recipient.infected,
+        },
+        disaster: disaster ?? 'blackout',
+        law,
+      });
+
+      return {
+        commit: true,
+        fields: {
+          food: String(resolution.nextFood),
+          power: String(resolution.nextPower),
+          health: String(resolution.nextHealth),
+          infected: resolution.nextInfected ? '1' : '0',
+        },
+        result: {
+          resolution,
+          bunker: toBunkerState({
+            ...recipient,
+            food: resolution.nextFood,
+            power: resolution.nextPower,
+            health: resolution.nextHealth,
+            infected: resolution.nextInfected,
+          }),
+        },
+      };
+    });
+
+    await Promise.all([
+      redis.hSet(crateKey, {
+        state: 'opened',
+        openedDay: String(day),
+      }),
+      redis.zRem(keys.doorstep(userId), [crateId]),
+      recordDailyAction(day, userId),
+    ]);
+    committed = true;
+
+    const { resolution, bunker } = recipientUpdate;
+    let fromUsername = crate['fromUsername'] ?? 'survivor';
+    let fromTrust = num(crate['fromTrust'] ?? '50');
+
+    if (!isNpc && fromId && !isNpcId(fromId)) {
+      const [storedName, senderResult] = await Promise.all([
+        redis.hGet(keys.usernames(), fromId),
+        updatePlayerAtomic(fromId, day, (sender) => {
+          const nextTrustGood =
+            sender.trustGood + resolution.senderTrustGoodDelta;
+          const nextTrustTotal =
+            sender.trustTotal + resolution.senderTrustTotalDelta;
+          const nextCures = sender.cures + resolution.senderCuresDelta;
+          let nextFood = sender.food;
+          let nextPower = sender.power;
+          if (kind === 'trojan' && resolution.senderGain > 0) {
+            if (resolution.stolenStat === 'food') {
+              nextFood = clampStat(sender.food + resolution.senderGain);
+            } else if (resolution.stolenStat === 'power') {
+              nextPower = clampStat(sender.power + resolution.senderGain);
+            }
+          }
+          return {
+            commit: true,
+            fields: {
+              trustGood: String(nextTrustGood),
+              trustTotal: String(nextTrustTotal),
+              cures: String(nextCures),
+              food: String(nextFood),
+              power: String(nextPower),
+            },
+            result: {
+              trustGood: nextTrustGood,
+              trustTotal: nextTrustTotal,
+              cures: nextCures,
+            },
+          };
+        }),
       ]);
-    }
 
-    if (kind === 'trojan') {
-      await redis.hIncrBy(keys.dayTraitors(day), fromId, 1);
-      if (resolution.senderGain > 0 && resolution.stolenStat) {
-        const senderData = await redis.hGetAll(senderKey);
-        const curStat = num(senderData[resolution.stolenStat]);
-        await redis.hSet(senderKey, {
-          [resolution.stolenStat]: String(
-            clampStat(curStat + resolution.senderGain)
-          ),
-        });
+      if (storedName) fromUsername = storedName;
+      fromTrust = trustPercent(
+        senderResult.trustGood,
+        senderResult.trustTotal
+      );
+
+      if (senderResult.trustTotal >= TRUST_LB_MIN_EVENTS) {
+        await redis.zAdd(keys.lbTrust(), { member: fromId, score: fromTrust });
+      }
+      if (resolution.senderCuresDelta > 0) {
+        await Promise.all([
+          redis.zAdd(keys.lbMedic(), {
+            member: fromId,
+            score: senderResult.cures,
+          }),
+          redis.hSet(keys.dayMedics(day), { [fromId]: '1' }),
+        ]);
+      }
+      if (kind === 'trojan') {
+        await redis.hIncrBy(keys.dayTraitors(day), fromId, 1);
       }
     }
+
+    const [crates, checklistData] = await Promise.all([
+      readDoorstep(userId),
+      readChecklist(day, userId),
+    ]);
+
+    const outcome: CrateOpenOutcome = {
+      crateId,
+      kind,
+      fromUsername,
+      fromTrust,
+      fromIsNpc: isNpc,
+      resource: kind === 'real' ? resource : null,
+      foodDelta: resolution.foodDelta,
+      powerDelta: resolution.powerDelta,
+      healthDelta: resolution.healthDelta,
+      stolenStat: resolution.stolenStat,
+      stolenAmount: resolution.stolenAmount,
+      cured: resolution.cured,
+      becameInfected: resolution.becameInfected,
+      lawHealed: resolution.lawHealed,
+      civilWarDouble: resolution.civilWarDouble,
+    };
+
+    return {
+      ok: true,
+      type: 'crate_open',
+      outcome,
+      bunker,
+      checklist: checklistData.checklist,
+      crates,
+    };
+  } catch (error) {
+    if (!committed) {
+      await redis.hDel(crateKey, ['resolveLock']);
+    }
+    throw error;
   }
-
-  const [crates, checklistData] = await Promise.all([
-    readDoorstep(userId),
-    readChecklist(day, userId),
-  ]);
-
-  const outcome: CrateOpenOutcome = {
-    crateId,
-    kind,
-    fromUsername,
-    fromTrust,
-    fromIsNpc: isNpc,
-    resource: kind === 'real' ? resource : null,
-    foodDelta: resolution.foodDelta,
-    powerDelta: resolution.powerDelta,
-    healthDelta: resolution.healthDelta,
-    stolenStat: resolution.stolenStat,
-    stolenAmount: resolution.stolenAmount,
-    cured: resolution.cured,
-    becameInfected: resolution.becameInfected,
-    lawHealed: resolution.lawHealed,
-    civilWarDouble: resolution.civilWarDouble,
-  };
-
-  return {
-    ok: true,
-    type: 'crate_open',
-    outcome,
-    bunker: toBunkerState({
-      ...recipient,
-      food: resolution.nextFood,
-      power: resolution.nextPower,
-      health: resolution.nextHealth,
-      infected: resolution.nextInfected,
-    }),
-    checklist: checklistData.checklist,
-    crates,
-  };
 };
 
 export type BurnCrateResult =
@@ -689,25 +781,34 @@ export const burnCrate = async (
     return err(409, 'This crate was already opened or burned');
   }
 
-  const recipient = await ensureBunker(userId, username, day);
+  let committed = false;
+  try {
+    const recipient = await ensureBunker(userId, username, day);
 
-  await Promise.all([
-    redis.hSet(crateKey, { state: 'burned', burnedDay: String(day) }),
-    redis.zRem(keys.doorstep(userId), [crateId]),
-    recordDailyAction(day, userId),
-  ]);
+    await Promise.all([
+      redis.hSet(crateKey, { state: 'burned', burnedDay: String(day) }),
+      redis.zRem(keys.doorstep(userId), [crateId]),
+      recordDailyAction(day, userId),
+    ]);
+    committed = true;
 
-  const [crates, checklistData] = await Promise.all([
-    readDoorstep(userId),
-    readChecklist(day, userId),
-  ]);
+    const [crates, checklistData] = await Promise.all([
+      readDoorstep(userId),
+      readChecklist(day, userId),
+    ]);
 
-  return {
-    ok: true,
-    type: 'crate_burn',
-    crateId,
-    bunker: toBunkerState(recipient),
-    checklist: checklistData.checklist,
-    crates,
-  };
+    return {
+      ok: true,
+      type: 'crate_burn',
+      crateId,
+      bunker: toBunkerState(recipient),
+      checklist: checklistData.checklist,
+      crates,
+    };
+  } catch (error) {
+    if (!committed) {
+      await redis.hDel(crateKey, ['resolveLock']);
+    }
+    throw error;
+  }
 };

@@ -8,6 +8,7 @@ export const keys = {
   dayWarden: (n: number) => `cp:day:${n}:warden`,
   dayActive: (n: number) => `cp:day:${n}:active`,
   dayBroadcasts: (n: number) => `cp:day:${n}:broadcasts`,
+  dayNpcBroadcasts: (n: number) => `cp:day:${n}:npcBroadcasts`,
   dayActions: (n: number, userId: string) => `cp:day:${n}:actions:${userId}`,
   dayCrateCount: (n: number) => `cp:day:${n}:crateCount`,
   dayTraitors: (n: number) => `cp:day:${n}:traitors`,

@@ -1,4 +1,5 @@
 import type {
+  ClaimId,
   CrateKind,
   CrateResource,
   CrateScanStatus,
@@ -55,6 +56,16 @@ export type SentCrateSummary = {
   rerouted: boolean;
 };
 
+export type RadioBroadcast = {
+  id: string;
+  senderName: string;
+  senderTrust: number | null;
+  isNpc: boolean;
+  isOfficial: boolean;
+  claimId: ClaimId | null;
+  text: string;
+};
+
 export type AppStateResponse = {
   type: 'state';
   gameName: string;
@@ -72,6 +83,7 @@ export type AppStateResponse = {
   lastScavenge: ScavengeOutcome | null;
   crates: DoorstepCrate[];
   lastSent: SentCrateSummary | null;
+  radioFeed: RadioBroadcast[];
 };
 
 export type ScavengeRequest = {

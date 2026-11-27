@@ -13,8 +13,8 @@ import {
   ensureBunker,
   readChecklist,
   recordDailyAction,
-  saveBunkerStats,
   toBunkerState,
+  updatePlayerAtomic,
 } from './bunker';
 import { getDayLaw } from './day';
 import { keys } from './keys';
@@ -30,7 +30,7 @@ export type ExecuteScavengeResult =
 
 /**
  * Atomically claims today's scavenge with hSetNX, rolls loot server-side,
- * updates the player's bunker, and records activity.
+ * updates the player's bunker via WATCH/MULTI/EXEC, and records activity.
  */
 export const executeScavenge = async (
   userId: string,
@@ -38,52 +38,66 @@ export const executeScavenge = async (
   day: number,
   site: ScavengeSiteId
 ): Promise<ExecuteScavengeResult> => {
-  const record = await ensureBunker(userId, username, day);
+  await ensureBunker(userId, username, day);
   const actionsKey = keys.dayActions(day, userId);
   const claimed = await redis.hSetNX(actionsKey, 'scavenged', '1');
   if (claimed !== 1) return { ok: false, reason: 'already_scavenged' };
 
-  const law = await getDayLaw(day);
-  const rolled = rollScavenge(site, law);
+  let committed = false;
+  try {
+    const law = await getDayLaw(day);
+    const rolled = rollScavenge(site, law);
 
-  const nextFood = clampStat(record.food + rolled.foodDelta);
-  const nextPower = clampStat(record.power + rolled.powerDelta);
-  const nextHealth = clampStat(record.health + rolled.healthDelta);
-  const nextScrap = Math.max(0, record.scrap + rolled.scrapDelta);
-  const becameInfected = nextHealth === 0 && !record.infected;
-  const nextInfected = record.infected || nextHealth === 0;
+    const updated = await updatePlayerAtomic(userId, day, (record) => {
+      const nextFood = clampStat(record.food + rolled.foodDelta);
+      const nextPower = clampStat(record.power + rolled.powerDelta);
+      const nextHealth = clampStat(record.health + rolled.healthDelta);
+      const nextScrap = Math.max(0, record.scrap + rolled.scrapDelta);
+      const becameInfected = nextHealth === 0 && !record.infected;
+      const nextInfected = record.infected || nextHealth === 0;
 
-  const outcome: ScavengeOutcome = {
-    ...rolled,
-    becameInfected,
-  };
+      return {
+        commit: true,
+        fields: {
+          food: String(nextFood),
+          power: String(nextPower),
+          health: String(nextHealth),
+          scrap: String(nextScrap),
+          infected: nextInfected ? '1' : '0',
+        },
+        result: {
+          outcome: { ...rolled, becameInfected },
+          bunker: toBunkerState({
+            ...record,
+            food: nextFood,
+            power: nextPower,
+            health: nextHealth,
+            scrap: nextScrap,
+            infected: nextInfected,
+          }),
+        },
+      };
+    });
 
-  await Promise.all([
-    saveBunkerStats(userId, {
-      food: nextFood,
-      power: nextPower,
-      health: nextHealth,
-      scrap: nextScrap,
-      infected: nextInfected,
-    }),
-    redis.hSet(actionsKey, { scavengeResult: JSON.stringify(outcome) }),
-    recordDailyAction(day, userId),
-  ]);
+    committed = true;
+    await Promise.all([
+      redis.hSet(actionsKey, {
+        scavengeResult: JSON.stringify(updated.outcome),
+      }),
+      recordDailyAction(day, userId),
+    ]);
 
-  const updatedRecord = {
-    ...record,
-    food: nextFood,
-    power: nextPower,
-    health: nextHealth,
-    scrap: nextScrap,
-    infected: nextInfected,
-  };
-  const { checklist } = await readChecklist(day, userId);
-
-  return {
-    ok: true,
-    outcome,
-    bunker: toBunkerState(updatedRecord),
-    checklist,
-  };
+    const { checklist } = await readChecklist(day, userId);
+    return {
+      ok: true,
+      outcome: updated.outcome,
+      bunker: updated.bunker,
+      checklist,
+    };
+  } catch (error) {
+    if (!committed) {
+      await redis.hDel(actionsKey, ['scavenged']);
+    }
+    throw error;
+  }
 };
