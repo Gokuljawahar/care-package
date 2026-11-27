@@ -9,6 +9,7 @@ import {
 } from '../../shared/game';
 import { PROMPTS, promptById, type Prompt } from '../../shared/prompts';
 import { keys } from './keys';
+import { postSummary, setStreakFlair } from './wrapup';
 
 export const getCurrentDay = async (): Promise<number> => {
   const raw = await redis.get(keys.currentDay());
@@ -146,7 +147,12 @@ export const closeDay = async (n: number): Promise<DayFinal | null> => {
   return { day: n, postId: await getDayPostId(n), prompts, grids, npc };
 };
 
-export type ResetResult = { closed: number | null; opened: Opened };
+export type ResetResult = {
+  closed: number | null;
+  opened: Opened;
+  flairs: number;
+  commented: boolean;
+};
 
 /**
  * The daily job (also run by the moderator menu):
@@ -161,12 +167,30 @@ export const runDailyReset = async (): Promise<ResetResult> => {
 
   try {
     const n = await getCurrentDay();
-    if (n === 0) return { closed: null, opened: await openDay(1) };
-    if (!(await getDayPostId(n))) return { closed: null, opened: await openDay(n) };
+    const fresh = { closed: null, flairs: 0, commented: false };
+    if (n === 0) return { ...fresh, opened: await openDay(1) };
+    if (!(await getDayPostId(n))) return { ...fresh, opened: await openDay(n) };
 
-    await closeDay(n);
+    const final = await closeDay(n);
     const opened = await openDay(n + 1);
-    return { closed: n, opened };
+
+    // Wrap-up is best effort: a flair or comment failure must not block the new day.
+    let flairs = 0;
+    let commented = false;
+    if (final) {
+      try {
+        flairs = await setStreakFlair(final);
+      } catch (error) {
+        console.error(`Flair update for day ${n} failed`, error);
+      }
+      try {
+        await postSummary(final, opened);
+        commented = true;
+      } catch (error) {
+        console.error(`Summary comment for day ${n} failed`, error);
+      }
+    }
+    return { closed: n, opened, flairs, commented };
   } finally {
     await redis.del(keys.resetLock());
   }
