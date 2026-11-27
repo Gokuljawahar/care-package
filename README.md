@@ -38,7 +38,7 @@ A scheduled task runs at **00:00 UTC** every day. It:
 1. **Closes yesterday**: no more taps, and every finisher's final NPC % is recorded.
 2. **Sets user flair** for yesterday's players, e.g. `Thumbprint · 7-day streak`.
 3. **Comments on yesterday's post** with a hotspot summary: where the crowd went on each prompt, the average score, the most NPC player, and a link to today's post.
-4. **Picks the next five unused prompts** from the pool of 36 (it starts a fresh cycle once all have been used).
+4. **Picks the next five unused prompts** from the pool of 41, always leading with one divisive "worst" prompt (it starts a fresh cycle once all have been used).
 5. **Creates today's post**, titled `Thumbprint #N: <first prompt title>`.
 
 Streaks count consecutive days on which you finish all five prompts.

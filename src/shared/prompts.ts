@@ -3,6 +3,8 @@ export type Prompt = {
   title: string;
   /** Name of the SVG component in src/client/pictures. */
   svgComponentName: string;
+  /** Divisive "worst/most annoying" prompts. Every day leads with one. */
+  spicy?: true;
 };
 
 export const PROMPTS: Prompt[] = [
@@ -70,6 +72,36 @@ export const PROMPTS: Prompt[] = [
   { id: 'flag', title: 'Plant the flag', svgComponentName: 'Mountain' },
   { id: 'note', title: 'Play one note', svgComponentName: 'Piano' },
   { id: 'dayoff', title: 'Pick your day off', svgComponentName: 'Week' },
+  {
+    id: 'emoji-worst',
+    title: 'Tap the worst emoji',
+    svgComponentName: 'EmojiGrid',
+    spicy: true,
+  },
+  {
+    id: 'seat-worst',
+    title: 'Pick the worst seat',
+    svgComponentName: 'Cinema',
+    spicy: true,
+  },
+  {
+    id: 'colour-worst',
+    title: 'Tap the ugliest colour',
+    svgComponentName: 'Swatches',
+    spicy: true,
+  },
+  {
+    id: 'app-delete',
+    title: 'Delete one app forever',
+    svgComponentName: 'HomeScreen',
+    spicy: true,
+  },
+  {
+    id: 'lift-worst',
+    title: 'Press the button you shouldn’t',
+    svgComponentName: 'Lift',
+    spicy: true,
+  },
 ];
 
 export const promptById = (id: string): Prompt | undefined =>

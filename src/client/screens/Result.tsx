@@ -1,4 +1,4 @@
-import { navigateTo, showToast } from '@devvit/web/client';
+import { navigateTo, showShareSheet, showToast } from '@devvit/web/client';
 import type { ResultResponse } from '../../shared/api';
 import type { Prompt } from '../../shared/prompts';
 import { Mini } from '../components/Mini';
@@ -17,13 +17,31 @@ export const Result = ({ result, prompts }: Props) => {
   const countdown = useCountdown(result.nextResetAt);
   const shown = useCountUp(result.npc);
 
-  const toComments = async () => {
+  const copy = async (message: string) => {
     try {
       await navigator.clipboard.writeText(shareText(result));
-      showToast('Result copied. Paste it in the comments');
+      showToast(message);
+      return true;
     } catch {
-      // Clipboard can be blocked in some webviews; still open the comments.
+      return false;
     }
+  };
+
+  const share = async () => {
+    try {
+      await showShareSheet({
+        title: `Thumbprint #${result.day}`,
+        text: shareText(result),
+      });
+    } catch {
+      // Outside Reddit's app the sheet may be unavailable: fall back to copying.
+      if (!(await copy('Result copied'))) showToast('Could not open sharing');
+    }
+  };
+
+  const toComments = async () => {
+    // Clipboard can be blocked in some webviews; still open the comments.
+    await copy('Result copied. Paste it in the comments');
     if (result.postUrl) navigateTo(result.postUrl);
   };
 
@@ -71,14 +89,25 @@ export const Result = ({ result, prompts }: Props) => {
         >
           Flex it in the comments
         </button>
-        <button
-          className="min-h-[44px] px-4 text-sm font-semibold text-muted underline-offset-4 hover:underline"
-          onClick={() =>
-            navigateTo(`https://www.reddit.com/r/${result.subredditName}/`)
-          }
-        >
-          Join r/{result.subredditName}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            className="min-h-[44px] px-4 text-sm font-semibold text-muted underline-offset-4 hover:underline"
+            onClick={() => void share()}
+          >
+            Share
+          </button>
+          <span className="text-muted" aria-hidden="true">
+            ·
+          </span>
+          <button
+            className="min-h-[44px] px-4 text-sm font-semibold text-muted underline-offset-4 hover:underline"
+            onClick={() =>
+              navigateTo(`https://www.reddit.com/r/${result.subredditName}/`)
+            }
+          >
+            Join r/{result.subredditName}
+          </button>
+        </div>
       </div>
     </div>
   );

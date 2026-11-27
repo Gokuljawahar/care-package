@@ -67,26 +67,62 @@ const seeded = (seed: number) => () => {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 };
 
-/** Picks the next unused prompts; when the pool runs dry it starts a new cycle. */
+/**
+ * Picks the day's prompts: one divisive ("spicy") prompt first, then unused
+ * prompts, never two with the same picture. When the unused pool runs dry it
+ * starts a new cycle (avoiding yesterday's prompts).
+ */
 const pickPrompts = async (n: number): Promise<string[]> => {
   const used = new Set(await redis.hKeys(keys.usedPrompts()));
-  let pool = PROMPTS.map((p) => p.id).filter((id) => !used.has(id));
-  if (pool.length < PROMPTS_PER_DAY) {
+  const yesterday = new Set(await readIds(n - 1));
+  let pool = PROMPTS.filter((p) => !used.has(p.id));
+  if (pool.length < PROMPTS_PER_DAY + 2) {
     await redis.del(keys.usedPrompts());
-    const yesterday = new Set(await readIds(n - 1));
-    pool = PROMPTS.map((p) => p.id).filter((id) => !yesterday.has(id));
+    pool = PROMPTS.filter((p) => !yesterday.has(p.id));
   }
   const rnd = seeded(n * 7919);
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rnd() * (i + 1));
-    [pool[i], pool[j]] = [pool[j] ?? '', pool[i] ?? ''];
-  }
-  const picked = pool.slice(0, PROMPTS_PER_DAY);
+  const shuffle = <T>(list: T[]): T[] => {
+    const a = [...list];
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      const tmp = a[i];
+      const other = a[j];
+      if (tmp === undefined || other === undefined) continue;
+      a[i] = other;
+      a[j] = tmp;
+    }
+    return a;
+  };
+  const shuffled = shuffle(pool);
+
+  // Spicy first: an unused one if any, otherwise any spicy not used yesterday.
+  const spicy =
+    shuffled.find((p) => p.spicy) ??
+    shuffle(PROMPTS.filter((p) => p.spicy && !yesterday.has(p.id)))[0];
+
+  const picked: Prompt[] = spicy ? [spicy] : [];
+  const fill = (candidates: Prompt[]) => {
+    for (const p of candidates) {
+      if (picked.length >= PROMPTS_PER_DAY) return;
+      if (
+        picked.some(
+          (q) => q.id === p.id || q.svgComponentName === p.svgComponentName
+        )
+      )
+        continue;
+      if (p.spicy) continue; // one divisive prompt a day is enough
+      picked.push(p);
+    }
+  };
+  fill(shuffled);
+  fill(shuffle(PROMPTS.filter((p) => !yesterday.has(p.id))));
+
+  const ids = picked.map((p) => p.id);
   await redis.hSet(
     keys.usedPrompts(),
-    Object.fromEntries(picked.map((id) => [id, String(n)]))
+    Object.fromEntries(ids.map((id) => [id, String(n)]))
   );
-  return picked;
+  return ids;
 };
 
 // --- opening and closing days -----------------------------------------------

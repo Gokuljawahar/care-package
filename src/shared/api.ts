@@ -15,6 +15,8 @@ export type PromptReveal = {
   grid: GridCell[];
   total: number;
   score: number;
+  /** % of all taps that landed in the player's neighbourhood. */
+  nearPct: number;
   /** True if the player's neighbourhood is the hottest spot. */
   hottest: boolean;
 };

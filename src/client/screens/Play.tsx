@@ -165,12 +165,12 @@ export const Play = ({
               <p className="font-display text-lg font-semibold text-ink">
                 {reveal.hottest
                   ? 'Bang on the hotspot'
-                  : `${reveal.score}% crowd match`}
+                  : `${reveal.nearPct}% tapped near you`}
               </p>
               <p className="text-[11px] leading-snug text-muted">
                 {reveal.total < MIN_CROWD
                   ? `You're one of the first ${reveal.total}. Check back after reset for the real crowd.`
-                  : `${reveal.total} taps so far`}
+                  : `Crowd match ${reveal.score}% · ${reveal.total} taps`}
               </p>
             </div>
             <button className="btn btn-primary shrink-0" onClick={onNext}>

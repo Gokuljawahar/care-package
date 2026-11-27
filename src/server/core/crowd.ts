@@ -34,14 +34,17 @@ export const buildReveal = (
   cy: number
 ): PromptReveal => {
   const top = hottest(grid).count;
+  const total = totalTaps(grid);
+  const near = neighbourhood(grid, cx, cy);
   return {
     promptId,
     cx,
     cy,
     grid: gridToCells(grid),
-    total: totalTaps(grid),
+    total,
     score: promptScore(grid, cx, cy),
-    hottest: top > 0 && neighbourhood(grid, cx, cy) === top,
+    nearPct: total > 0 ? Math.round((near / total) * 100) : 0,
+    hottest: top > 0 && near === top,
   };
 };
 
