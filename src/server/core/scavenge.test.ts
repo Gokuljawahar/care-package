@@ -16,40 +16,40 @@ const seqRng = (values: readonly number[]): (() => number) => {
   };
 };
 
-void test('pharmacy grants +2 Food or +2 Power with no scrap or injury', () => {
+void test('pharmacy grants +3 Food or +3 Power and +1 Health with no scrap', () => {
   const foodRun = rollScavenge('pharmacy', undefined, seqRng([0.1, 0.2]));
-  assert.equal(foodRun.foodDelta, 2);
+  assert.equal(foodRun.foodDelta, 3);
   assert.equal(foodRun.powerDelta, 0);
   assert.equal(foodRun.scrapDelta, 0);
-  assert.equal(foodRun.healthDelta, 0);
+  assert.equal(foodRun.healthDelta, 1);
   assert.equal(foodRun.lawBonus, false);
 
   const powerRun = rollScavenge('pharmacy', undefined, seqRng([0.9, 0.2]));
   assert.equal(powerRun.foodDelta, 0);
-  assert.equal(powerRun.powerDelta, 2);
+  assert.equal(powerRun.powerDelta, 3);
   assert.equal(powerRun.scrapDelta, 0);
-  assert.equal(powerRun.healthDelta, 0);
+  assert.equal(powerRun.healthDelta, 1);
 });
 
-void test('mall splits +3 supplies, +1 scrap, and hurts 20% of the time', () => {
+void test('mall splits +4 supplies, +1 scrap, and hurts 20% of the time', () => {
   const hurtRun = rollScavenge('mall', undefined, seqRng([0.5, 0.19, 0.1, 0.2]));
-  assert.equal(hurtRun.foodDelta + hurtRun.powerDelta, 3);
+  assert.equal(hurtRun.foodDelta + hurtRun.powerDelta, 4);
   assert.equal(hurtRun.scrapDelta, 1);
   assert.equal(hurtRun.healthDelta, -2);
 
   const safeRun = rollScavenge('mall', undefined, seqRng([0.5, 0.2, 0.1, 0.2]));
-  assert.equal(safeRun.foodDelta + safeRun.powerDelta, 3);
+  assert.equal(safeRun.foodDelta + safeRun.powerDelta, 4);
   assert.equal(safeRun.scrapDelta, 1);
   assert.equal(safeRun.healthDelta, 0);
 });
 
-void test('military splits +5 supplies, +2 scrap, and hurts 45% of the time', () => {
+void test('military splits +6 supplies, +2 scrap, and hurts 45% of the time', () => {
   const hurtRun = rollScavenge(
     'military',
     undefined,
     seqRng([0.3, 0.44, 0.1, 0.2, 0.3])
   );
-  assert.equal(hurtRun.foodDelta + hurtRun.powerDelta, 5);
+  assert.equal(hurtRun.foodDelta + hurtRun.powerDelta, 6);
   assert.equal(hurtRun.scrapDelta, 2);
   assert.equal(hurtRun.healthDelta, -4);
 
@@ -58,7 +58,7 @@ void test('military splits +5 supplies, +2 scrap, and hurts 45% of the time', ()
     undefined,
     seqRng([0.3, 0.45, 0.1, 0.2, 0.3])
   );
-  assert.equal(safeRun.foodDelta + safeRun.powerDelta, 5);
+  assert.equal(safeRun.foodDelta + safeRun.powerDelta, 6);
   assert.equal(safeRun.scrapDelta, 2);
   assert.equal(safeRun.healthDelta, 0);
 });
@@ -69,7 +69,7 @@ void test('scavenge_plus_one law adds +1 total supply', () => {
     'scavenge_plus_one',
     seqRng([0.1, 0.2])
   );
-  assert.equal(boosted.foodDelta + boosted.powerDelta, 3);
+  assert.equal(boosted.foodDelta + boosted.powerDelta, 4);
   assert.equal(boosted.lawBonus, true);
 });
 

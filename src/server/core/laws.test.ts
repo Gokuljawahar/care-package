@@ -29,8 +29,8 @@ void test('Law 3 (friends_only): random deliveries are disallowed when active', 
 void test('Law 4 (scavenge_plus_one): scavenging yields +1 extra supply', () => {
   const normal = rollScavenge('pharmacy', undefined, () => 0.1);
   const surged = rollScavenge('pharmacy', 'scavenge_plus_one', () => 0.1);
-  assert.equal(normal.foodDelta + normal.powerDelta, 2);
-  assert.equal(surged.foodDelta + surged.powerDelta, 3);
+  assert.equal(normal.foodDelta + normal.powerDelta, 3);
+  assert.equal(surged.foodDelta + surged.powerDelta, 4);
   assert.equal(surged.lawBonus, true);
 });
 

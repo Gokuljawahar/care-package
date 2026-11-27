@@ -16,7 +16,7 @@ import {
   type WardenCandidate,
 } from '../../shared/night.ts';
 
-void test('applyActiveNight computes upkeep, all 5 disasters, and 2x Health deficit damage', () => {
+void test('applyActiveNight computes upkeep, all 5 disasters, and 1x Health deficit damage', () => {
   // Blackout: -1 Food, -1 Power, -3 Power = -1 Food, -4 Power.
   const blackout = applyActiveNight({
     food: 6,
@@ -28,7 +28,7 @@ void test('applyActiveNight computes upkeep, all 5 disasters, and 2x Health defi
   assert.equal(blackout.nextFood, 5);
   assert.equal(blackout.nextPower, 0);
   assert.equal(blackout.powerMissing, 1);
-  assert.equal(blackout.nextHealth, 8);
+  assert.equal(blackout.nextHealth, 9);
 
   // Zombie Outbreak: barricades hold when power after upkeep >= 3.
   const zombieHeld = applyActiveNight({
@@ -97,7 +97,7 @@ void test('applyAwayCatchUp caps missed nights at 3, floors Health at 1, and for
   assert.equal(away.cappedNights, 3);
   assert.equal(away.nextFood, 0);
   assert.equal(away.nextPower, 0);
-  // Deficit: 1 food + 2 power = 6 damage, but absence never drops Health below 1.
+  // Deficit: 1 food + 2 power = 3 damage, but absence never drops Health below 1.
   assert.equal(away.nextHealth, 1);
   assert.equal(away.summary, 'You were away 5 nights: −2 Food, −1 Power');
 });
@@ -225,7 +225,7 @@ const createInitialSim = (): SimState => ({
     u2: {
       food: 5,
       power: 2,
-      health: 3,
+      health: 2,
       infected: false,
       lastNightApplied: 0,
       infectionCheckedDay: 0,
@@ -400,7 +400,7 @@ void test('runMidnightPipeline resumes cleanly after mid-step crashes and matche
   await runMidnightPipeline(1, makeSimBackend(crashedSim), fixedRng);
 
   assert.deepEqual(crashedSim, cleanSim);
-  // u2 had power 2, blackout dealt -4 power -> 2 missing -> -4 health -> 0 -> infected!
+  // u2 had power 2, blackout dealt -4 power -> 2 missing -> -2 health -> 0 -> infected!
   assert.equal(cleanSim.players['u2']?.infected, true);
   assert.equal(cleanSim.players['u1']?.daysSurvived, 1);
   // u1 broadcast true claim, u1 is elected Warden (u2 is infected, u3 had only 2 actions).

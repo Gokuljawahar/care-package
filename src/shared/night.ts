@@ -31,7 +31,7 @@ export type NightUpkeepOutcome = {
 
 /**
  * Applies daily upkeep (-1 Food, -1 Power) and tonight's disaster to an active player.
- * Every missing unit below 0 deals 2 Health damage.
+ * Every missing unit below 0 deals 1 Health damage.
  */
 export const applyActiveNight = (
   input: NightUpkeepInput
@@ -71,7 +71,7 @@ export const applyActiveNight = (
   const powerMissing = Math.max(0, -rawPower);
   const nextFood = clampStat(rawFood);
   const nextPower = clampStat(rawPower);
-  const deficitDamage = (foodMissing + powerMissing) * 2;
+  const deficitDamage = foodMissing + powerMissing;
   const nextHealth = clampStat(
     input.health - deficitDamage - disasterHealthLoss
   );
@@ -125,7 +125,7 @@ export const applyAwayCatchUp = (
 
   const nextFood = clampStat(rawFood);
   const nextPower = clampStat(rawPower);
-  const deficitDamage = (foodMissing + powerMissing) * 2;
+  const deficitDamage = foodMissing + powerMissing;
   const nextHealth = input.infected
     ? input.health
     : Math.max(1, clampStat(input.health - deficitDamage));

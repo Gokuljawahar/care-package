@@ -207,19 +207,19 @@ export const SCAVENGE_SITES: Record<ScavengeSiteId, ScavengeSiteMeta> = {
   pharmacy: {
     id: 'pharmacy',
     name: 'Pharmacy',
-    tagline: '+2 Food or +2 Power',
+    tagline: '+3 Food or +3 Power, +1 Health',
     riskLabel: 'Safe',
   },
   mall: {
     id: 'mall',
     name: 'Dead Mall',
-    tagline: '+3 Food/Power, +1 Scrap',
+    tagline: '+4 Food/Power, +1 Scrap',
     riskLabel: '20% chance -2 Health',
   },
   military: {
     id: 'military',
     name: 'Military Base',
-    tagline: '+5 Food/Power, +2 Scrap',
+    tagline: '+6 Food/Power, +2 Scrap',
     riskLabel: '45% chance -4 Health',
   },
 };
@@ -593,16 +593,17 @@ export const rollScavenge = (
   let healthDelta = 0;
 
   if (site === 'pharmacy') {
-    if (rng() < 0.5) foodDelta = 2;
-    else powerDelta = 2;
+    if (rng() < 0.5) foodDelta = 3;
+    else powerDelta = 3;
+    healthDelta = 1;
   } else if (site === 'mall') {
-    foodDelta = Math.floor(rng() * 4);
-    powerDelta = 3 - foodDelta;
+    foodDelta = Math.floor(rng() * 5);
+    powerDelta = 4 - foodDelta;
     scrapDelta = 1;
     if (rng() < 0.2) healthDelta = -2;
   } else {
-    foodDelta = Math.floor(rng() * 6);
-    powerDelta = 5 - foodDelta;
+    foodDelta = Math.floor(rng() * 7);
+    powerDelta = 6 - foodDelta;
     scrapDelta = 2;
     if (rng() < 0.45) healthDelta = -4;
   }

@@ -113,6 +113,11 @@ export const Scavenge = ({ initialOutcome, onComplete, onBack }: Props) => {
               {outcome.scrapDelta > 0 && (
                 <span className="pill">+{outcome.scrapDelta} Scrap</span>
               )}
+              {outcome.healthDelta > 0 && (
+                <span className="pill text-toxic">
+                  +{outcome.healthDelta} Health
+                </span>
+              )}
               {outcome.healthDelta < 0 && (
                 <span className="pill text-danger">
                   {outcome.healthDelta} Health

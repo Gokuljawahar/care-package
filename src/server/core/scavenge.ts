@@ -53,7 +53,9 @@ export const executeScavenge = async (
     const updated = await updatePlayerAtomic(userId, day, (record) => {
       const nextFood = clampStat(record.food + rolled.foodDelta);
       const nextPower = clampStat(record.power + rolled.powerDelta);
-      const nextHealth = clampStat(record.health + rolled.healthDelta);
+      const effectiveHealthDelta =
+        record.infected && rolled.healthDelta > 0 ? 0 : rolled.healthDelta;
+      const nextHealth = clampStat(record.health + effectiveHealthDelta);
       const nextScrap = Math.max(0, record.scrap + rolled.scrapDelta);
       const becameInfected = nextHealth === 0 && !record.infected;
       const nextInfected = record.infected || nextHealth === 0;
@@ -68,7 +70,11 @@ export const executeScavenge = async (
           infected: nextInfected ? '1' : '0',
         },
         result: {
-          outcome: { ...rolled, becameInfected },
+          outcome: {
+            ...rolled,
+            healthDelta: effectiveHealthDelta,
+            becameInfected,
+          },
           bunker: toBunkerState({
             ...record,
             food: nextFood,

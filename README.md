@@ -12,7 +12,7 @@ Built for **Reddit's Game of the Day Hackathon 2026**.
 
 Open today's Care Package post to manage your bunker (**Food 0–10**, **Power 0–10**, **Health 0–10**, and **Scrap**). Each day you can perform four actions in any order:
 
-1. **Scavenge (1/day):** Pick a location — **Pharmacy** (`+2` Food or Power, safe), **Dead Mall** (`+3` split + `1` Scrap, 20% chance `-2` Health), or **Military Base** (`+5` split + `2` Scrap, 45% chance `-4` Health).
+1. **Scavenge (1/day):** Pick a location — **Pharmacy** (`+3` Food or Power & `+1` Health, safe), **Dead Mall** (`+4` split + `1` Scrap, 20% chance `-2` Health), or **Military Base** (`+6` split + `2` Scrap, 45% chance `-4` Health).
 2. **Check your Doorstep:** Crates left for you can be **Scanned** (`1 Power` to check Real vs. Trojan), **Opened** (Real crates deliver `+3` total supplies; Trojans steal `3` of your highest stat and deal `-2` Health), or **Burned** safely with no Trust change. Unopened crates burn automatically after `sentDay + 1`.
 3. **Send a Care Package (1/day):** Send to a **Random** survivor or a **Friend** by username (who has played in the subreddit). Pack **2 Food or Power** (`+1` bonus for the recipient) or rig a **Trojan** with `2 Scrap`.
 4. **Broadcast on the Radio (1/day):** Pick one claim from a fixed list (no free text). Everyone sees **1 verified official hint** plus up to **4 sampled broadcasts**. True claims raise your **Trust %** at midnight; lies lower it.
@@ -29,7 +29,7 @@ Every night at **00:00 UTC**, everyone pays `-1 Food` and `-1 Power` upkeep, the
 | **Civil War** | `-2 Food`; Trojans opened today steal double (`6`) |
 | **AI Uprising** | Scans jam 50% of the time today; `-2 Power` |
 
-- Any missing Food or Power below `0` deals **2 Health damage per missing unit**.
+- Any missing Food or Power below `0` deals **1 Health damage per missing unit**.
 - Players who skip days catch up lazily on return: upkeep only (`-1 Food, -1 Power` per night, capped at 3 nights), and absence never drops Health below `1`.
 - **Infection:** At Health `0`, you flip **Infected 🧟** — your crates are always free Trojans and your broadcasts show by default unless filtered. Open a **Real** crate from a surviving player to be **Cured** (Health `5`) and earn your rescuer **Medic** credit.
 - **Warden of the Day:** At midnight, the highest-Trust surviving player with ≥3 actions becomes **Warden** and chooses **1 of 3 laws** (auto-picked at `12:00 UTC` if undecided).
@@ -65,15 +65,16 @@ Stack: **React 19 + TypeScript + Tailwind 4 + Vite** client, **Hono** server, De
 
 ```bash
 npm install
-npm run login        # once: devvit login
-npm run dev          # devvit playtest in dev subreddit
-npx tsc --build      # type-check
-npm run lint         # eslint
-npm run test:unit    # Node unit tests & 30-day balance simulation
-npm run build        # production Vite build
-npm run deploy       # type-check, lint, upload
-npx devvit publish   # submit for Reddit review
+npm run hooks:install                              # activate pre-push safety checks
+npm run login                                      # once: devvit login
+npm run dev                                        # devvit playtest in r/thumbprint_daily_dev
+npm run check                                      # tsc + eslint + unit tests + vite build
+npm run deploy:test                                # check, upload, install on r/thumbprint_daily_dev
+CONFIRM_PROD=CarePackageGame npm run deploy:prod   # guarded deploy to r/CarePackageGame
+CONFIRM_PROD=CarePackageGame npm run publish:prod  # guarded submit for Reddit review
 ```
+
+See [RELEASE.md](RELEASE.md) for the full branching model (`feat/*` -> `dev` -> `main`), automated release guardrails, and rollback steps.
 
 ### Architecture & Redis Keys (`cp:` prefix)
 
