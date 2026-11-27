@@ -30,6 +30,8 @@ export type TodayResponse = {
   bestStreak: number;
   nextResetAt: number;
   subredditName: string;
+  /** Link to the current day's post when this post is an older, closed day. */
+  todayPostUrl: string | null;
 };
 
 export type TapRequest = {

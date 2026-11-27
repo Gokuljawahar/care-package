@@ -35,9 +35,11 @@ export const Start = ({ today, onPlay, onLeaderboard }: Props) => {
       {today.closed ? (
         <button
           className="btn btn-primary w-full"
-          onClick={() => navigateTo(`https://www.reddit.com/r/${today.subredditName}/`)}
+          onClick={() =>
+            navigateTo(today.todayPostUrl ?? `https://www.reddit.com/r/${today.subredditName}/`)
+          }
         >
-          This day is closed. Find today’s
+          Day closed. Play today’s
         </button>
       ) : (
         <button className="btn btn-primary btn-xl w-full" onClick={onPlay} disabled={blocked}>

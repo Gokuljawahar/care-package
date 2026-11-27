@@ -10,7 +10,7 @@ import type {
   TapResponse,
   TodayResponse,
 } from '../../shared/api';
-import { ensureDay, getDayPrompts, isDayClosed } from '../core/day';
+import { ensureDay, getDayPostId, getDayPrompts, isDayClosed } from '../core/day';
 import { liveStreak, readUser, recordFinish } from '../core/user';
 import { buildReveal, readGrid, readReveals } from '../core/crowd';
 import { keys } from '../core/keys';
@@ -19,6 +19,9 @@ import { scoreDay, topPercent } from '../core/score';
 export const api = new Hono();
 
 const fail = (message: string): ErrorResponse => ({ status: 'error', message });
+
+const commentsUrl = (postId: string): string =>
+  `https://www.reddit.com/r/${context.subredditName}/comments/${postId.replace(/^t3_/, '')}/`;
 
 /** The day this post belongs to (from postData), falling back to today. */
 const resolveDay = async (): Promise<number> => {
@@ -39,6 +42,7 @@ api.get('/today', async (c) => {
       : [];
     const user = userId ? await readUser(userId) : null;
     const current = await ensureDay();
+    const todayPostId = day !== current ? await getDayPostId(current) : undefined;
 
     return c.json<TodayResponse>({
       type: 'today',
@@ -51,6 +55,7 @@ api.get('/today', async (c) => {
       bestStreak: user?.bestStreak ?? 0,
       nextResetAt: nextResetAt(Date.now()),
       subredditName: context.subredditName,
+      todayPostUrl: todayPostId ? commentsUrl(todayPostId) : null,
     });
   } catch (error) {
     console.error('GET /api/today failed', error);
@@ -115,11 +120,7 @@ api.post('/tap', async (c) => {
   }
 });
 
-const postUrl = (): string | null => {
-  const id = context.postId;
-  if (!id) return null;
-  return `https://www.reddit.com/r/${context.subredditName}/comments/${id.replace(/^t3_/, '')}/`;
-};
+const postUrl = (): string | null => (context.postId ? commentsUrl(context.postId) : null);
 
 api.get('/result', async (c) => {
   const { userId } = context;

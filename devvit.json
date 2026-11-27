@@ -20,11 +20,11 @@
   "menu": {
     "items": [
       {
-        "label": "Create a new post",
-        "description": "thumbprint",
+        "label": "Create today's Thumbprint post",
+        "description": "Closes the current day and posts the next one",
         "location": "subreddit",
         "forUserType": "moderator",
-        "endpoint": "/internal/menu/post-create"
+        "endpoint": "/internal/menu/create-today"
       }
     ]
   },
@@ -38,5 +38,13 @@
   "permissions": {
     "redis": true,
     "reddit": true
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-reset": {
+        "endpoint": "/internal/scheduler/daily-reset",
+        "cron": "0 0 * * *"
+      }
+    }
   }
 }

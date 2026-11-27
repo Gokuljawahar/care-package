@@ -1,30 +1,23 @@
 import { Hono } from 'hono';
 import type { OnAppInstallRequest, TriggerResponse } from '@devvit/web/shared';
-import { context } from '@devvit/web/server';
-import { createPost } from '../core/post';
+import { getCurrentDay, runDailyReset } from '../core/day';
 
 export const triggers = new Hono();
 
+// First install: create Thumbprint #1 straight away.
 triggers.post('/on-app-install', async (c) => {
   try {
-    const post = await createPost();
     const input = await c.req.json<OnAppInstallRequest>();
-
+    if ((await getCurrentDay()) > 0) {
+      return c.json<TriggerResponse>({ status: 'success', message: 'Already set up' }, 200);
+    }
+    const { opened } = await runDailyReset();
     return c.json<TriggerResponse>(
-      {
-        status: 'success',
-        message: `Post created in subreddit ${context.subredditName} with id ${post.id} (trigger: ${input.type})`,
-      },
+      { status: 'success', message: `Created Thumbprint #${opened.day} (${opened.postId}) on ${input.type}` },
       200
     );
   } catch (error) {
-    console.error(`Error creating post: ${error}`);
-    return c.json<TriggerResponse>(
-      {
-        status: 'error',
-        message: 'Failed to create post',
-      },
-      400
-    );
+    console.error('Install setup failed', error);
+    return c.json<TriggerResponse>({ status: 'error', message: 'Failed to create the first post' }, 400);
   }
 });
