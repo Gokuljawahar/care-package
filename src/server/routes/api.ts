@@ -1,13 +1,25 @@
 import { Hono } from 'hono';
 import { context, redis } from '@devvit/web/server';
-import { GAME_NAME, nextResetAt, trustPercent } from '../../shared/game';
+import {
+  GAME_NAME,
+  isScavengeSiteId,
+  nextResetAt,
+  trustPercent,
+} from '../../shared/game';
 import type {
   AppStateResponse,
   ErrorResponse,
   LeaderboardEntry,
   LeaderboardResponse,
+  ScavengeResponse,
   WardenBanner,
 } from '../../shared/api';
+import {
+  emptyChecklist,
+  ensureBunker,
+  readChecklist,
+  toBunkerState,
+} from '../core/bunker';
 import {
   ensureDay,
   getDayLaw,
@@ -16,6 +28,7 @@ import {
   isDayClosed,
 } from '../core/day';
 import { keys } from '../core/keys';
+import { executeScavenge } from '../core/scavenge';
 
 export const api = new Hono();
 
@@ -58,29 +71,80 @@ api.get('/state', async (c) => {
   try {
     const day = await resolveDay();
     const current = await ensureDay();
-    const [closed, warden, law, todayPostId] = await Promise.all([
-      isDayClosed(day),
-      loadWardenBanner(day),
-      getDayLaw(day),
-      day !== current ? getDayPostId(current) : Promise.resolve(undefined),
-    ]);
+    const { userId, username } = context;
+
+    const [closed, warden, law, todayPostId, bunkerRecord, checklistData] =
+      await Promise.all([
+        isDayClosed(day),
+        loadWardenBanner(day),
+        getDayLaw(day),
+        day !== current ? getDayPostId(current) : Promise.resolve(undefined),
+        userId ? ensureBunker(userId, username, current) : Promise.resolve(null),
+        userId
+          ? readChecklist(day, userId)
+          : Promise.resolve({
+              checklist: emptyChecklist(),
+              lastScavenge: null,
+            }),
+      ]);
 
     return c.json<AppStateResponse>({
       type: 'state',
       gameName: GAME_NAME,
       day,
       closed,
-      loggedIn: Boolean(context.userId),
-      username: context.username ?? null,
+      loggedIn: Boolean(userId),
+      username: username ?? null,
       nextResetAt: nextResetAt(Date.now()),
       subredditName: context.subredditName,
       todayPostUrl: todayPostId ? commentsUrl(todayPostId) : null,
       warden,
       law: law ?? null,
+      bunker: bunkerRecord ? toBunkerState(bunkerRecord) : null,
+      checklist: checklistData.checklist,
+      lastScavenge: checklistData.lastScavenge,
     });
   } catch (error) {
     console.error('GET /api/state failed', error);
     return c.json(fail('Could not load bunker state'), 500);
+  }
+});
+
+api.post('/scavenge', async (c) => {
+  const { userId, username } = context;
+  if (!userId) return c.json(fail('Log in to scavenge'), 401);
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json(fail('Bad request'), 400);
+  }
+  if (
+    typeof rawBody !== 'object' ||
+    rawBody === null ||
+    !('site' in rawBody) ||
+    !isScavengeSiteId(rawBody.site)
+  ) {
+    return c.json(fail('Choose a valid scavenge site'), 400);
+  }
+
+  try {
+    const day = await resolveDay();
+    if (await isDayClosed(day)) return c.json(fail('This day is closed'), 409);
+
+    const res = await executeScavenge(userId, username, day, rawBody.site);
+    if (!res.ok) return c.json(fail('You already scavenged today'), 409);
+
+    return c.json<ScavengeResponse>({
+      type: 'scavenge',
+      outcome: res.outcome,
+      bunker: res.bunker,
+      checklist: res.checklist,
+    });
+  } catch (error) {
+    console.error('POST /api/scavenge failed', error);
+    return c.json(fail('Scavenge run failed'), 500);
   }
 });
 

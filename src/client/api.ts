@@ -2,6 +2,8 @@ import type {
   AppStateResponse,
   ErrorResponse,
   LeaderboardResponse,
+  ScavengeRequest,
+  ScavengeResponse,
 } from '../shared/api';
 
 export class ApiError extends Error {
@@ -31,6 +33,13 @@ const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export const getState = () => call<AppStateResponse>('/api/state');
+
+export const postScavenge = (body: ScavengeRequest) =>
+  call<ScavengeResponse>('/api/scavenge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 
 export const getLeaderboard = () =>
   call<LeaderboardResponse>('/api/leaderboard');

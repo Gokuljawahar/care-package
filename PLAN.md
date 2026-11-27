@@ -87,6 +87,6 @@ Verified directly against `node_modules/@devvit/*` (stay on `0.15.4`; do not upg
 ## 5. Open Items (Section 11)
 
 1. **Final game name:** **Care Package** (`GAME_NAME` constant in `src/shared/game.ts`).
-2. **Devpost hackathon URL & judging criteria:** Pending user paste.
-3. **Target launch subreddit:** Pending user confirmation (keep `thumbprint_daily_dev` for playtesting).
+2. **Devpost hackathon URL & judging criteria:** `https://redditgameofday2026.devpost.com/` — four equally weighted criteria: **Delightful UX**, **Polish** (launch quality, Devvit Rules compliant, self-explanatory demo post), **Reddit-like & Community-Minded** (comments, flair, streaks, community interaction), and **Fresh Recurring Content** (daily loop, variety, replayability).
+3. **Target launch subreddit:** TBD (keep copy generic; keep `thumbprint_daily_dev` for playtesting).
 4. **Two-player testing:** User confirmed second Reddit account will be ready for Milestone 2.

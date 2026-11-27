@@ -360,6 +360,116 @@ export const trustPercent = (good: number, total: number): number =>
 export const clampStat = (value: number): number =>
   Math.min(STAT_MAX, Math.max(STAT_MIN, Math.trunc(value)));
 
+export type ScavengeOutcome = {
+  site: ScavengeSiteId;
+  foodDelta: number;
+  powerDelta: number;
+  scrapDelta: number;
+  healthDelta: number;
+  loot: string[];
+  note: string;
+  becameInfected: boolean;
+  lawBonus: boolean;
+};
+
+export type RolledScavenge = Omit<ScavengeOutcome, 'becameInfected'>;
+
+const FOOD_LOOT: readonly string[] = [
+  'half a granola bar',
+  'expired energy drink',
+  'lukewarm canned beans',
+  'crushed ramen brick',
+  'mystery jerky',
+  '1998 MRE',
+];
+
+const POWER_LOOT: readonly string[] = [
+  'phone at 3%',
+  'one (1) AirPod',
+  'duct-taped battery',
+  'cracked solar bank',
+  'loose copper wire',
+  'half-charged power tool',
+];
+
+const SCRAP_LOOT: readonly string[] = [
+  'bent crowbar',
+  'rusted padlock',
+  'salvaged circuit board',
+  'box of bolts',
+];
+
+const SAFE_NOTES: Record<ScavengeSiteId, string> = {
+  pharmacy: 'Quiet shelves. You grabbed what still had a label.',
+  mall: 'The escalator groaned, but nobody spotted you.',
+  military: 'Siren stayed silent. Best haul all week.',
+};
+
+const HURT_NOTES: Record<ScavengeSiteId, string> = {
+  pharmacy: 'Safe haul.',
+  mall: 'A tripwire snapped near the food court. You limped out.',
+  military: 'Motion turret grazed your shoulder before you bolted.',
+};
+
+const pickItem = (list: readonly string[], rng: () => number): string => {
+  const idx = Math.floor(rng() * list.length);
+  return list[idx] ?? list[0] ?? 'mystery ration';
+};
+
+/**
+ * Pure server-side roll for a scavenge run. Shared so unit tests can run directly.
+ */
+export const rollScavenge = (
+  site: ScavengeSiteId,
+  law: LawId | undefined,
+  rng: () => number = Math.random
+): RolledScavenge => {
+  let foodDelta = 0;
+  let powerDelta = 0;
+  let scrapDelta = 0;
+  let healthDelta = 0;
+
+  if (site === 'pharmacy') {
+    if (rng() < 0.5) foodDelta = 2;
+    else powerDelta = 2;
+  } else if (site === 'mall') {
+    foodDelta = Math.floor(rng() * 4);
+    powerDelta = 3 - foodDelta;
+    scrapDelta = 1;
+    if (rng() < 0.2) healthDelta = -2;
+  } else {
+    foodDelta = Math.floor(rng() * 6);
+    powerDelta = 5 - foodDelta;
+    scrapDelta = 2;
+    if (rng() < 0.45) healthDelta = -4;
+  }
+
+  let lawBonus = false;
+  if (law === 'scavenge_plus_one') {
+    lawBonus = true;
+    if (foodDelta >= powerDelta) foodDelta += 1;
+    else powerDelta += 1;
+  }
+
+  const loot: string[] = [];
+  if (foodDelta > 0) loot.push(pickItem(FOOD_LOOT, rng));
+  if (powerDelta > 0) loot.push(pickItem(POWER_LOOT, rng));
+  if (scrapDelta > 0) loot.push(pickItem(SCRAP_LOOT, rng));
+
+  const note = healthDelta < 0 ? HURT_NOTES[site] : SAFE_NOTES[site];
+
+  return {
+    site,
+    foodDelta,
+    powerDelta,
+    scrapDelta,
+    healthDelta,
+    loot,
+    note,
+    lawBonus,
+  };
+};
+
 /** Milliseconds timestamp of the next 00:00 UTC. */
 export const nextResetAt = (now: number): number => {
   const d = new Date(now);
