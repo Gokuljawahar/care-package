@@ -12,10 +12,18 @@ import { useCountdown } from '../hooks/useCountdown';
 type Props = {
   state: AppStateResponse;
   onScavenge: () => void;
+  onDoorstep: () => void;
+  onSend: () => void;
   onLeaderboard: () => void;
 };
 
-export const Home = ({ state, onScavenge, onLeaderboard }: Props) => {
+export const Home = ({
+  state,
+  onScavenge,
+  onDoorstep,
+  onSend,
+  onLeaderboard,
+}: Props) => {
   const countdown = useCountdown(state.nextResetAt);
   const lawMeta = state.law ? LAWS[state.law] : null;
   const bunker = state.bunker;
@@ -138,10 +146,7 @@ export const Home = ({ state, onScavenge, onLeaderboard }: Props) => {
             </span>
           </button>
 
-          <button
-            className="action-card"
-            onClick={() => showToast('Doorstep crates unlock in Milestone 2')}
-          >
+          <button className="action-card" onClick={onDoorstep}>
             <span className="text-sm font-bold">Doorstep</span>
             <span className="text-[11px] text-muted">
               {checklist.doorstepWaiting} waiting
@@ -151,7 +156,7 @@ export const Home = ({ state, onScavenge, onLeaderboard }: Props) => {
           <button
             className="action-card"
             data-done={checklist.sent ? 'true' : 'false'}
-            onClick={() => showToast('Sending crates unlocks in Milestone 2')}
+            onClick={onSend}
           >
             <span className="text-sm font-bold">Send Crate</span>
             <span className="text-[11px] text-muted">

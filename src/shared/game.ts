@@ -230,6 +230,8 @@ export const isScavengeSiteId = (v: unknown): v is ScavengeSiteId =>
 export type CrateKind = 'real' | 'trojan';
 export type CrateResource = 'food' | 'power';
 export type CrateState = 'waiting' | 'opened' | 'burned';
+export type CrateScanStatus = 'unscanned' | 'real' | 'trojan' | 'jammed';
+export type CrateTargetMode = 'random' | 'friend';
 
 export const isCrateKind = (v: unknown): v is CrateKind =>
   v === 'real' || v === 'trojan';
@@ -239,6 +241,165 @@ export const isCrateResource = (v: unknown): v is CrateResource =>
 
 export const isCrateState = (v: unknown): v is CrateState =>
   v === 'waiting' || v === 'opened' || v === 'burned';
+
+export const trojanCostFor = (
+  infected: boolean,
+  law: LawId | undefined
+): number => {
+  if (infected) return 0;
+  return law === 'double_trojan_cost'
+    ? TROJAN_SCRAP_COST * 2
+    : TROJAN_SCRAP_COST;
+};
+
+export const scanCostFor = (law: LawId | undefined): number =>
+  law === 'free_scans' ? 0 : 1;
+
+export type CrateOpenInput = {
+  kind: CrateKind;
+  resource: CrateResource;
+  recipient: {
+    food: number;
+    power: number;
+    health: number;
+    infected: boolean;
+  };
+  disaster: DisasterId;
+  law: LawId | undefined;
+};
+
+export type CrateOpenResolution = {
+  nextFood: number;
+  nextPower: number;
+  nextHealth: number;
+  nextInfected: boolean;
+  foodDelta: number;
+  powerDelta: number;
+  healthDelta: number;
+  stolenStat: CrateResource | null;
+  stolenAmount: number;
+  senderGain: number;
+  senderTrustGoodDelta: number;
+  senderTrustTotalDelta: number;
+  senderCuresDelta: number;
+  cured: boolean;
+  becameInfected: boolean;
+  lawHealed: boolean;
+  civilWarDouble: boolean;
+};
+
+/** Pure server-side resolution for opening a waiting care package. */
+export const resolveCrateOpen = (
+  input: CrateOpenInput
+): CrateOpenResolution => {
+  const { kind, resource, recipient, disaster, law } = input;
+
+  if (kind === 'real') {
+    if (recipient.infected) {
+      const nextFood =
+        resource === 'food'
+          ? clampStat(recipient.food + REAL_CRATE_COST)
+          : recipient.food;
+      const nextPower =
+        resource === 'power'
+          ? clampStat(recipient.power + REAL_CRATE_COST)
+          : recipient.power;
+      const nextHealth = clampStat(Math.max(recipient.health, CURE_HEALTH));
+      return {
+        nextFood,
+        nextPower,
+        nextHealth,
+        nextInfected: false,
+        foodDelta: nextFood - recipient.food,
+        powerDelta: nextPower - recipient.power,
+        healthDelta: nextHealth - recipient.health,
+        stolenStat: null,
+        stolenAmount: 0,
+        senderGain: 0,
+        senderTrustGoodDelta: 3,
+        senderTrustTotalDelta: 3,
+        senderCuresDelta: 1,
+        cured: true,
+        becameInfected: false,
+        lawHealed: false,
+        civilWarDouble: false,
+      };
+    }
+
+    const totalGain = REAL_CRATE_COST + REAL_CRATE_BONUS;
+    const nextFood =
+      resource === 'food'
+        ? clampStat(recipient.food + totalGain)
+        : recipient.food;
+    const nextPower =
+      resource === 'power'
+        ? clampStat(recipient.power + totalGain)
+        : recipient.power;
+    const lawHealed = law === 'real_crate_heals';
+    const nextHealth = lawHealed
+      ? clampStat(recipient.health + 1)
+      : recipient.health;
+    return {
+      nextFood,
+      nextPower,
+      nextHealth,
+      nextInfected: false,
+      foodDelta: nextFood - recipient.food,
+      powerDelta: nextPower - recipient.power,
+      healthDelta: nextHealth - recipient.health,
+      stolenStat: null,
+      stolenAmount: 0,
+      senderGain: 0,
+      senderTrustGoodDelta: 1,
+      senderTrustTotalDelta: 1,
+      senderCuresDelta: 0,
+      cured: false,
+      becameInfected: false,
+      lawHealed,
+      civilWarDouble: false,
+    };
+  }
+
+  const civilWarDouble = disaster === 'civil_war';
+  const stealCap = civilWarDouble ? 6 : 3;
+  const stolenStat: CrateResource =
+    recipient.food >= recipient.power ? 'food' : 'power';
+  const available = stolenStat === 'food' ? recipient.food : recipient.power;
+  const stolenAmount = Math.min(available, stealCap);
+  const senderGain = Math.floor(stolenAmount / 2);
+
+  const nextFood =
+    stolenStat === 'food'
+      ? clampStat(recipient.food - stolenAmount)
+      : recipient.food;
+  const nextPower =
+    stolenStat === 'power'
+      ? clampStat(recipient.power - stolenAmount)
+      : recipient.power;
+  const nextHealth = clampStat(recipient.health - 2);
+  const becameInfected = nextHealth === 0 && !recipient.infected;
+  const nextInfected = recipient.infected || nextHealth === 0;
+
+  return {
+    nextFood,
+    nextPower,
+    nextHealth,
+    nextInfected,
+    foodDelta: nextFood - recipient.food,
+    powerDelta: nextPower - recipient.power,
+    healthDelta: nextHealth - recipient.health,
+    stolenStat,
+    stolenAmount,
+    senderGain,
+    senderTrustGoodDelta: 0,
+    senderTrustTotalDelta: 1,
+    senderCuresDelta: 0,
+    cured: false,
+    becameInfected,
+    lawHealed: false,
+    civilWarDouble,
+  };
+};
 
 export type ClaimId =
   | 'tonight_blackout'

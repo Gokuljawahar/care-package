@@ -1,4 +1,12 @@
-import type { LawId, ScavengeOutcome, ScavengeSiteId } from './game';
+import type {
+  CrateKind,
+  CrateResource,
+  CrateScanStatus,
+  CrateTargetMode,
+  LawId,
+  ScavengeOutcome,
+  ScavengeSiteId,
+} from './game';
 
 export type { ScavengeOutcome } from './game';
 
@@ -31,6 +39,22 @@ export type DayChecklist = {
   broadcast: boolean;
 };
 
+export type DoorstepCrate = {
+  id: string;
+  fromUsername: string;
+  fromTrust: number;
+  fromIsNpc: boolean;
+  day: number;
+  scanStatus: CrateScanStatus;
+};
+
+export type SentCrateSummary = {
+  recipientUsername: string;
+  kind: CrateKind;
+  resource: CrateResource | null;
+  rerouted: boolean;
+};
+
 export type AppStateResponse = {
   type: 'state';
   gameName: string;
@@ -46,6 +70,8 @@ export type AppStateResponse = {
   bunker: BunkerState | null;
   checklist: DayChecklist;
   lastScavenge: ScavengeOutcome | null;
+  crates: DoorstepCrate[];
+  lastSent: SentCrateSummary | null;
 };
 
 export type ScavengeRequest = {
@@ -57,6 +83,69 @@ export type ScavengeResponse = {
   outcome: ScavengeOutcome;
   bunker: BunkerState;
   checklist: DayChecklist;
+};
+
+export type CrateSendRequest = {
+  targetMode: CrateTargetMode;
+  recipientUsername?: string | undefined;
+  kind: CrateKind;
+  resource?: CrateResource | undefined;
+};
+
+export type CrateSendResponse = {
+  type: 'crate_send';
+  summary: SentCrateSummary;
+  bunker: BunkerState;
+  checklist: DayChecklist;
+};
+
+export type CrateActionRequest = {
+  crateId: string;
+};
+
+export type CrateScanResponse = {
+  type: 'crate_scan';
+  crateId: string;
+  jammed: boolean;
+  scanStatus: CrateScanStatus;
+  powerCost: number;
+  bunker: BunkerState;
+  checklist: DayChecklist;
+  crates: DoorstepCrate[];
+};
+
+export type CrateOpenOutcome = {
+  crateId: string;
+  kind: CrateKind;
+  fromUsername: string;
+  fromTrust: number;
+  fromIsNpc: boolean;
+  resource: CrateResource | null;
+  foodDelta: number;
+  powerDelta: number;
+  healthDelta: number;
+  stolenStat: CrateResource | null;
+  stolenAmount: number;
+  cured: boolean;
+  becameInfected: boolean;
+  lawHealed: boolean;
+  civilWarDouble: boolean;
+};
+
+export type CrateOpenResponse = {
+  type: 'crate_open';
+  outcome: CrateOpenOutcome;
+  bunker: BunkerState;
+  checklist: DayChecklist;
+  crates: DoorstepCrate[];
+};
+
+export type CrateBurnResponse = {
+  type: 'crate_burn';
+  crateId: string;
+  bunker: BunkerState;
+  checklist: DayChecklist;
+  crates: DoorstepCrate[];
 };
 
 export type LeaderboardTab = 'streak' | 'trust' | 'medic';

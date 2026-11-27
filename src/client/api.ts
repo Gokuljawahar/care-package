@@ -1,5 +1,11 @@
 import type {
   AppStateResponse,
+  CrateActionRequest,
+  CrateBurnResponse,
+  CrateOpenResponse,
+  CrateScanResponse,
+  CrateSendRequest,
+  CrateSendResponse,
   ErrorResponse,
   LeaderboardResponse,
   ScavengeRequest,
@@ -32,14 +38,29 @@ const call = async <T>(path: string, init?: RequestInit): Promise<T> => {
   return data;
 };
 
-export const getState = () => call<AppStateResponse>('/api/state');
-
-export const postScavenge = (body: ScavengeRequest) =>
-  call<ScavengeResponse>('/api/scavenge', {
+const postJson = <T>(path: string, body: unknown) =>
+  call<T>(path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
+export const getState = () => call<AppStateResponse>('/api/state');
+
+export const postScavenge = (body: ScavengeRequest) =>
+  postJson<ScavengeResponse>('/api/scavenge', body);
+
+export const postCrateSend = (body: CrateSendRequest) =>
+  postJson<CrateSendResponse>('/api/crates/send', body);
+
+export const postCrateScan = (body: CrateActionRequest) =>
+  postJson<CrateScanResponse>('/api/crates/scan', body);
+
+export const postCrateOpen = (body: CrateActionRequest) =>
+  postJson<CrateOpenResponse>('/api/crates/open', body);
+
+export const postCrateBurn = (body: CrateActionRequest) =>
+  postJson<CrateBurnResponse>('/api/crates/burn', body);
 
 export const getLeaderboard = () =>
   call<LeaderboardResponse>('/api/leaderboard');
