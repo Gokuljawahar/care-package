@@ -255,6 +255,9 @@ export const trojanCostFor = (
 export const scanCostFor = (law: LawId | undefined): number =>
   law === 'free_scans' ? 0 : 1;
 
+export const isRandomDeliveryAllowed = (law: LawId | undefined): boolean =>
+  law !== 'friends_only';
+
 export type CrateOpenInput = {
   kind: CrateKind;
   resource: CrateResource;

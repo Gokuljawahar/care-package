@@ -25,6 +25,13 @@
         "location": "subreddit",
         "forUserType": "moderator",
         "endpoint": "/internal/menu/create-today"
+      },
+      {
+        "label": "Debug: set my Health to 1 (+5 Scrap)",
+        "description": "DEV ONLY (thumbprint_daily_dev): sets your bunker Health to 1 and adds +5 Scrap",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/debug-hurt"
       }
     ]
   },

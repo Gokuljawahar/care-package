@@ -70,6 +70,7 @@ Verified directly against `node_modules/@devvit/*` (stay on `0.15.4`; do not upg
 - **Polish:** Hero crate opening animation (shake → crack → supplies burst or red Trojan flash), respecting `prefers-reduced-motion`; verify every screen fits `320×440` and `390×512` with zero scrolling and `≥44px` tap targets.
 
 ### Milestone 8 — Balance Pass, README & Devpost Write-Up
+- **Pre-publish cleanup:** Remove `DEV_DEBUG_SUBREDDIT` and `/internal/menu/debug-hurt` from `src/server/routes/menu.ts` and `devvit.json` before publishing!
 - **Balance:** 30-day simulation script + `npm run test:unit` suite targeting sensible-play survival, ~15–30% daily infection rate, and Trust vs. Trojan payoff balance.
 - **Docs:** Rewrite `README.md`, draft Devpost write-up, and draft a 1-minute demo video script.
 

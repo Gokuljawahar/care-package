@@ -170,6 +170,7 @@ void test('/api/state serialized response never leaks tonight disaster id or nam
         isWarden: false,
         wardenLawOptions: [],
         awayNotice: null,
+        nightReport: null,
       };
 
       assert.equal('disaster' in state, false);

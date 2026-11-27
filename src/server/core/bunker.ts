@@ -6,10 +6,12 @@ import {
 import type {
   BunkerState,
   DayChecklist,
+  NightReportData,
   ScavengeOutcome,
 } from '../../shared/api';
 import {
   clampStat,
+  isDisasterId,
   isScavengeSiteId,
   START_FOOD,
   START_HEALTH,
@@ -191,6 +193,10 @@ export const applyLazyCatchUp = async (
         },
         result: {
           missedNights,
+          infected: record.infected,
+          daysSurvived: record.daysSurvived,
+          trust: trustPercent(record.trustGood, record.trustTotal),
+          cures: record.cures,
           ...caught,
         },
       };
@@ -199,21 +205,104 @@ export const applyLazyCatchUp = async (
 
   if (!outcome) return null;
 
+  const report: NightReportData = {
+    day: latestClosedDay,
+    away: true,
+    missedNights: outcome.missedNights,
+    awaySummary: outcome.summary,
+    disaster: null,
+    disasterName: null,
+    foodDelta: -outcome.foodLost,
+    powerDelta: -outcome.powerLost,
+    healthDelta: -outcome.healthLost,
+    infected: outcome.infected,
+    daysSurvived: outcome.daysSurvived,
+    trust: outcome.trust,
+    cures: outcome.cures,
+    sentCrateNote: null,
+    broadcastClaimText: null,
+    broadcastTrue: null,
+    liarCallout: null,
+    nextWardenName: null,
+  };
+
   await redis.set(
     keys.dayReport(latestClosedDay, userId),
-    JSON.stringify({
-      day: latestClosedDay,
-      away: true,
-      missedNights: outcome.missedNights,
-      foodLost: outcome.foodLost,
-      powerLost: outcome.powerLost,
-      healthLost: outcome.healthLost,
-      summary: outcome.summary,
-    })
+    JSON.stringify(report)
   );
 
   return outcome.summary;
 };
+
+const isNullableStr = (v: unknown): v is string | null =>
+  v === null || typeof v === 'string';
+
+const isNightReportData = (v: unknown): v is NightReportData => {
+  if (typeof v !== 'object' || v === null) return false;
+  if (!('day' in v) || typeof v.day !== 'number') return false;
+  if (!('away' in v) || typeof v.away !== 'boolean') return false;
+  if (!('missedNights' in v) || typeof v.missedNights !== 'number')
+    return false;
+  if (!('awaySummary' in v) || !isNullableStr(v.awaySummary)) return false;
+  if (
+    !('disaster' in v) ||
+    (v.disaster !== null && !isDisasterId(v.disaster))
+  ) {
+    return false;
+  }
+  if (!('disasterName' in v) || !isNullableStr(v.disasterName)) return false;
+  if (!('foodDelta' in v) || typeof v.foodDelta !== 'number') return false;
+  if (!('powerDelta' in v) || typeof v.powerDelta !== 'number') return false;
+  if (!('healthDelta' in v) || typeof v.healthDelta !== 'number') return false;
+  if (!('infected' in v) || typeof v.infected !== 'boolean') return false;
+  if (!('daysSurvived' in v) || typeof v.daysSurvived !== 'number')
+    return false;
+  if (!('trust' in v) || typeof v.trust !== 'number') return false;
+  if (!('cures' in v) || typeof v.cures !== 'number') return false;
+  if (!('sentCrateNote' in v) || !isNullableStr(v.sentCrateNote)) return false;
+  if (!('broadcastClaimText' in v) || !isNullableStr(v.broadcastClaimText))
+    return false;
+  if (
+    !('broadcastTrue' in v) ||
+    (v.broadcastTrue !== null && typeof v.broadcastTrue !== 'boolean')
+  ) {
+    return false;
+  }
+  if (!('liarCallout' in v) || !isNullableStr(v.liarCallout)) return false;
+  if (!('nextWardenName' in v) || !isNullableStr(v.nextWardenName))
+    return false;
+  return true;
+};
+
+export const readUnseenNightReport = async (
+  userId: string,
+  latestClosedDay: number,
+  seenReportDay: number
+): Promise<NightReportData | null> => {
+  if (latestClosedDay <= 0 || seenReportDay >= latestClosedDay) return null;
+  const raw = await redis.get(keys.dayReport(latestClosedDay, userId));
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return isNightReportData(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+export const markNightReportSeen = async (
+  userId: string,
+  currentDay: number,
+  reportDay: number
+): Promise<number> =>
+  updatePlayerAtomic(userId, currentDay, (record) => {
+    const next = Math.max(record.seenReportDay, reportDay);
+    return {
+      commit: true,
+      fields: { seenReportDay: String(next) },
+      result: next,
+    };
+  });
 
 const isStringArray = (v: unknown): v is string[] =>
   Array.isArray(v) && v.every((item) => typeof item === 'string');

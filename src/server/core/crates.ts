@@ -14,6 +14,7 @@ import {
   isCrateKind,
   isCrateResource,
   isNpcId,
+  isRandomDeliveryAllowed,
   MAX_CRATES_PER_DAY,
   REAL_CRATE_COST,
   resolveCrateOpen,
@@ -241,7 +242,7 @@ export const sendCrate = async (
 
   const currentDay = await getCurrentDay();
   const law = await resolveDayLaw(day, currentDay || day);
-  if (req.targetMode === 'random' && law === 'friends_only') {
+  if (req.targetMode === 'random' && !isRandomDeliveryAllowed(law)) {
     return err(409, 'Warden law: random deliveries are suspended today');
   }
 
@@ -301,6 +302,12 @@ export const sendCrate = async (
         (await redis.hGet(keys.usernames(), foundId)) ?? normalized;
     } else {
       await redis.hIncrBy(keys.dayCrateCount(day), foundId, -1);
+      if (!isRandomDeliveryAllowed(law)) {
+        return err(
+          409,
+          'That doorstep is full today (random overflow suspended by Warden law)'
+        );
+      }
       const overflow = await claimRandomRecipient(
         senderId,
         day,

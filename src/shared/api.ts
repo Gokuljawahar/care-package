@@ -4,6 +4,7 @@ import type {
   CrateResource,
   CrateScanStatus,
   CrateTargetMode,
+  DisasterId,
   LawId,
   ScavengeOutcome,
   ScavengeSiteId,
@@ -66,6 +67,36 @@ export type RadioBroadcast = {
   text: string;
 };
 
+export type NightReportData = {
+  day: number;
+  away: boolean;
+  missedNights: number;
+  awaySummary: string | null;
+  disaster: DisasterId | null;
+  disasterName: string | null;
+  foodDelta: number;
+  powerDelta: number;
+  healthDelta: number;
+  infected: boolean;
+  daysSurvived: number;
+  trust: number;
+  cures: number;
+  sentCrateNote: string | null;
+  broadcastClaimText: string | null;
+  broadcastTrue: boolean | null;
+  liarCallout: string | null;
+  nextWardenName: string | null;
+};
+
+export type SeenReportRequest = {
+  day: number;
+};
+
+export type SeenReportResponse = {
+  type: 'report_seen';
+  seenReportDay: number;
+};
+
 export type AppStateResponse = {
   type: 'state';
   gameName: string;
@@ -88,6 +119,7 @@ export type AppStateResponse = {
   isWarden: boolean;
   wardenLawOptions: LawId[];
   awayNotice: string | null;
+  nightReport: NightReportData | null;
 };
 
 export type WardenLawRequest = {

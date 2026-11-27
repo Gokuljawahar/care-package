@@ -68,7 +68,11 @@ export const Leaderboard = ({ onBack }: { onBack: () => void }) => {
         )}
         {data && rows.length === 0 && (
           <li className="p-4 text-center text-muted">
-            Nobody yet. Survive Day {data.day} first.
+            {tab === 'trust'
+              ? 'Needs 3 resolved crates or broadcasts to qualify.'
+              : tab === 'medic'
+                ? 'No Infected survivors cured yet.'
+                : `Nobody yet. Survive Day ${data.day} first.`}
           </li>
         )}
         {rows.map((r, i) => (

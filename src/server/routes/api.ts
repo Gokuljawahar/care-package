@@ -6,6 +6,7 @@ import {
   isCrateKind,
   isCrateResource,
   isLawId,
+  isNpcId,
   isScavengeSiteId,
   nextResetAt,
   trustPercent,
@@ -17,6 +18,7 @@ import type {
   LeaderboardEntry,
   LeaderboardResponse,
   ScavengeResponse,
+  SeenReportResponse,
   WardenBanner,
   WardenLawResponse,
 } from '../../shared/api';
@@ -24,7 +26,9 @@ import {
   applyLazyCatchUp,
   emptyChecklist,
   ensureBunker,
+  markNightReportSeen,
   readChecklist,
+  readUnseenNightReport,
   toBunkerState,
 } from '../core/bunker';
 import {
@@ -179,6 +183,7 @@ api.get('/state', async (c) => {
       crates,
       lastSent,
       myBroadcast,
+      nightReport,
     ] = await Promise.all([
       isDayClosed(day),
       loadWardenBanner(day),
@@ -195,6 +200,9 @@ api.get('/state', async (c) => {
       userId ? readDoorstep(userId) : Promise.resolve([]),
       userId ? readLastSent(day, userId) : Promise.resolve(null),
       userId ? readMyBroadcast(day, userId) : Promise.resolve(null),
+      userId && current > 1 && bunkerRecord
+        ? readUnseenNightReport(userId, current - 1, bunkerRecord.seenReportDay)
+        : Promise.resolve(null),
     ]);
 
     const radioFeed = await readRadioFeed(
@@ -230,6 +238,7 @@ api.get('/state', async (c) => {
       isWarden,
       wardenLawOptions: isWarden && !law && !closed ? lawOptions : [],
       awayNotice,
+      nightReport,
     });
   } catch (error) {
     console.error('GET /api/state failed', error);
@@ -425,15 +434,54 @@ api.post('/warden/law', async (c) => {
   }
 });
 
+api.post('/report/seen', async (c) => {
+  const { userId } = context;
+  if (!userId) return c.json(fail('Log in first'), 401);
+
+  let rawBody: unknown;
+  try {
+    rawBody = await c.req.json();
+  } catch {
+    return c.json(fail('Bad request'), 400);
+  }
+  if (
+    typeof rawBody !== 'object' ||
+    rawBody === null ||
+    !('day' in rawBody) ||
+    typeof rawBody.day !== 'number' ||
+    !Number.isInteger(rawBody.day) ||
+    rawBody.day <= 0
+  ) {
+    return c.json(fail('Invalid report day'), 400);
+  }
+
+  try {
+    const current = await ensureDay();
+    const seenReportDay = await markNightReportSeen(
+      userId,
+      current,
+      rawBody.day
+    );
+    return c.json<SeenReportResponse>({
+      type: 'report_seen',
+      seenReportDay,
+    });
+  } catch (error) {
+    console.error('POST /api/report/seen failed', error);
+    return c.json(fail('Could not mark report seen'), 500);
+  }
+});
+
 const withUsernames = async (
   rows: { member: string; score: number }[]
 ): Promise<LeaderboardEntry[]> => {
-  if (rows.length === 0) return [];
+  const realRows = rows.filter((r) => !isNpcId(r.member));
+  if (realRows.length === 0) return [];
   const names = await redis.hMGet(
     keys.usernames(),
-    rows.map((r) => r.member)
+    realRows.map((r) => r.member)
   );
-  return rows.map((r, i) => ({
+  return realRows.map((r, i) => ({
     username: names[i] ?? 'survivor',
     value: r.score,
   }));

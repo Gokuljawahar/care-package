@@ -1,5 +1,6 @@
 import { reddit, redis } from '@devvit/web/server';
 import {
+  CLAIMS,
   DISASTER_IDS,
   DISASTERS,
   GAME_NAME,
@@ -12,6 +13,7 @@ import {
   trustPercent,
   type DisasterId,
 } from '../../shared/game';
+import type { NightReportData } from '../../shared/api';
 import {
   applyActiveNight,
   runMidnightPipeline,
@@ -355,30 +357,75 @@ const createRedisMidnightBackend = (): MidnightBackend => ({
       .filter((id) => !isNpcId(id));
     if (realIds.length === 0) return;
 
-    const [nightMap, broadcastMap, broadcastResMap, playerHashes] =
-      await Promise.all([
-        redis.hGetAll(keys.dayNightResults(day)),
-        redis.hGetAll(keys.dayBroadcasts(day)),
-        redis.hGetAll(keys.dayBroadcastResults(day)),
-        Promise.all(realIds.map((id) => redis.hGetAll(keys.player(id)))),
-      ]);
+    const [
+      nightMap,
+      broadcastMap,
+      broadcastResMap,
+      liarsMap,
+      playerHashes,
+    ] = await Promise.all([
+      redis.hGetAll(keys.dayNightResults(day)),
+      redis.hGetAll(keys.dayBroadcasts(day)),
+      redis.hGetAll(keys.dayBroadcastResults(day)),
+      redis.hGetAll(keys.dayLiars(day)),
+      Promise.all(realIds.map((id) => redis.hGetAll(keys.player(id)))),
+    ]);
 
     const nextWardenId = (await redis.get(keys.dayWarden(day + 1))) ?? null;
     const nextWardenName = nextWardenId
       ? ((await redis.hGet(keys.usernames(), nextWardenId)) ?? null)
       : null;
 
+    const liarIds = Object.keys(liarsMap).filter((id) => !isNpcId(id));
+    const liarNames =
+      liarIds.length > 0 ? await redis.hMGet(keys.usernames(), liarIds) : [];
+
     await Promise.all(
       realIds.map(async (uid, idx) => {
         const rawNight = nightMap[uid];
         const rec = parseRecord(playerHashes[idx] ?? {}, day);
-        const claim = broadcastMap[uid] ?? null;
+        const rawClaim = broadcastMap[uid];
+        const broadcastClaimText = isClaimId(rawClaim)
+          ? CLAIMS[rawClaim].text
+          : null;
         const broadcastTrue =
           broadcastResMap[uid] === '1'
             ? true
             : broadcastResMap[uid] === '0'
               ? false
               : null;
+
+        let sentCrateNote: string | null = null;
+        const sentCrateId = await redis.hGet(
+          keys.dayActions(day, uid),
+          'sentCrateId'
+        );
+        if (sentCrateId) {
+          const crate = await redis.hGetAll(keys.crate(sentCrateId));
+          const toId = crate['to'];
+          const toName = toId
+            ? ((await redis.hGet(keys.usernames(), toId)) ?? 'survivor')
+            : 'survivor';
+          if (crate['state'] === 'opened') {
+            sentCrateNote = `Your crate to u/${toName} was opened.`;
+          } else if (crate['state'] === 'burned') {
+            sentCrateNote = `Your crate to u/${toName} was burned.`;
+          } else if (crate['state'] === 'waiting') {
+            sentCrateNote = `Your crate to u/${toName} is still waiting.`;
+          }
+        }
+
+        let liarCallout: string | null = null;
+        const otherLiarIdx = liarIds.findIndex((id) => id !== uid);
+        const pickedIdx = otherLiarIdx !== -1 ? otherLiarIdx : 0;
+        const pickedLiarId = liarIds[pickedIdx];
+        if (pickedLiarId && pickedLiarId !== uid) {
+          const lName = liarNames[pickedIdx];
+          const lClaim = liarsMap[pickedLiarId];
+          if (lName && isClaimId(lClaim)) {
+            liarCallout = `u/${lName} lied: "${CLAIMS[lClaim].text}"`;
+          }
+        }
 
         let parsedNight: Record<string, unknown> | null = null;
         if (rawNight) {
@@ -392,37 +439,42 @@ const createRedisMidnightBackend = (): MidnightBackend => ({
           }
         }
 
-        await redis.set(
-          keys.dayReport(day, uid),
-          JSON.stringify({
-            day,
-            away: false,
-            disaster,
-            disasterName: DISASTERS[disaster].name,
-            foodDelta: num(
-              typeof parsedNight?.['foodDelta'] === 'number'
-                ? String(parsedNight['foodDelta'])
-                : undefined
-            ),
-            powerDelta: num(
-              typeof parsedNight?.['powerDelta'] === 'number'
-                ? String(parsedNight['powerDelta'])
-                : undefined
-            ),
-            healthDelta: num(
-              typeof parsedNight?.['healthDelta'] === 'number'
-                ? String(parsedNight['healthDelta'])
-                : undefined
-            ),
-            infected: rec.infected,
-            daysSurvived: rec.daysSurvived,
-            trust: trustPercent(rec.trustGood, rec.trustTotal),
-            broadcastClaim: claim,
-            broadcastTrue,
-            nextWardenName,
-          }),
-          { nx: true }
-        );
+        const report: NightReportData = {
+          day,
+          away: false,
+          missedNights: 0,
+          awaySummary: null,
+          disaster,
+          disasterName: DISASTERS[disaster].name,
+          foodDelta: num(
+            typeof parsedNight?.['foodDelta'] === 'number'
+              ? String(parsedNight['foodDelta'])
+              : undefined
+          ),
+          powerDelta: num(
+            typeof parsedNight?.['powerDelta'] === 'number'
+              ? String(parsedNight['powerDelta'])
+              : undefined
+          ),
+          healthDelta: num(
+            typeof parsedNight?.['healthDelta'] === 'number'
+              ? String(parsedNight['healthDelta'])
+              : undefined
+          ),
+          infected: rec.infected,
+          daysSurvived: rec.daysSurvived,
+          trust: trustPercent(rec.trustGood, rec.trustTotal),
+          cures: rec.cures,
+          sentCrateNote,
+          broadcastClaimText,
+          broadcastTrue,
+          liarCallout,
+          nextWardenName,
+        };
+
+        await redis.set(keys.dayReport(day, uid), JSON.stringify(report), {
+          nx: true,
+        });
       })
     );
   },

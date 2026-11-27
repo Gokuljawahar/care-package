@@ -12,6 +12,8 @@ import type {
   RadioBroadcastResponse,
   ScavengeRequest,
   ScavengeResponse,
+  SeenReportRequest,
+  SeenReportResponse,
   WardenLawRequest,
   WardenLawResponse,
 } from '../shared/api';
@@ -71,6 +73,9 @@ export const postRadioBroadcast = (body: RadioBroadcastRequest) =>
 
 export const postWardenLaw = (body: WardenLawRequest) =>
   postJson<WardenLawResponse>('/api/warden/law', body);
+
+export const postReportSeen = (body: SeenReportRequest) =>
+  postJson<SeenReportResponse>('/api/report/seen', body);
 
 export const getLeaderboard = () =>
   call<LeaderboardResponse>('/api/leaderboard');

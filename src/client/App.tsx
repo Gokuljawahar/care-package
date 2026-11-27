@@ -13,6 +13,7 @@ import { getState } from './api';
 import { Doorstep } from './screens/Doorstep';
 import { Home } from './screens/Home';
 import { Leaderboard } from './screens/Leaderboard';
+import { NightReport } from './screens/NightReport';
 import { Radio } from './screens/Radio';
 import { Scavenge } from './screens/Scavenge';
 import { Send } from './screens/Send';
@@ -118,6 +119,21 @@ export const App = () => {
     return (
       <main className="app enter">
         <Leaderboard onBack={() => setScreen('home')} />
+      </main>
+    );
+  }
+
+  if (state.nightReport) {
+    return (
+      <main className="app enter">
+        <NightReport
+          report={state.nightReport}
+          onDismiss={() =>
+            setState((prev) =>
+              prev ? { ...prev, nightReport: null, awayNotice: null } : prev
+            )
+          }
+        />
       </main>
     );
   }
