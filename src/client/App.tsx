@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import type { PromptReveal, ResultResponse, TodayResponse } from '../shared/api';
 import { getResult, getToday } from './api';
+import { Leaderboard } from './screens/Leaderboard';
 import { Play } from './screens/Play';
 import { Result } from './screens/Result';
+import { Start } from './screens/Start';
 
-type Screen = 'play' | 'result';
+type Screen = 'start' | 'play' | 'result' | 'leaderboard';
 
 const firstOpenIndex = (t: TodayResponse) => {
   const i = t.prompts.findIndex((p) => !t.reveals.some((r) => r.promptId === p.id));
@@ -14,7 +16,7 @@ const firstOpenIndex = (t: TodayResponse) => {
 export const App = () => {
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [result, setResult] = useState<ResultResponse | null>(null);
-  const [screen, setScreen] = useState<Screen>('play');
+  const [screen, setScreen] = useState<Screen>('start');
   const [index, setIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +45,20 @@ export const App = () => {
   if (error) return <Shell><p className="font-semibold text-pink">{error}</p></Shell>;
   if (!today) return <Shell><p className="text-muted">Loading…</p></Shell>;
 
+  if (screen === 'start') {
+    return (
+      <main className="app">
+        <Start today={today} onPlay={() => setScreen('play')} onLeaderboard={() => setScreen('leaderboard')} />
+      </main>
+    );
+  }
+  if (screen === 'leaderboard') {
+    return (
+      <main className="app">
+        <Leaderboard onBack={() => setScreen('start')} />
+      </main>
+    );
+  }
   if (screen === 'result') {
     return result ? (
       <main className="app">

@@ -190,3 +190,62 @@ body,
   border: 1.5px solid #1b1210;
   transform: translate(-50%, -50%);
 }
+
+/* Start + leaderboard */
+.btn-xl {
+  min-height: 60px;
+  font-size: 22px;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.chip,
+.streak-chip {
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--color-surface);
+  font-weight: 600;
+  font-size: 14px;
+}
+.streak-chip {
+  font-size: 16px;
+  background: var(--color-surface-2);
+}
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.tabs {
+  display: flex;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--color-surface);
+}
+.tab {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+.tab[aria-selected='true'] {
+  background: var(--color-yellow);
+  color: #1b1210;
+}
+.lb-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 15px;
+  border-bottom: 1px solid var(--color-surface);
+}

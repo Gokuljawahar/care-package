@@ -1,5 +1,6 @@
 import type {
   ErrorResponse,
+  LeaderboardResponse,
   ResultResponse,
   TapRequest,
   TapResponse,
@@ -41,3 +42,5 @@ export const postTap = (body: TapRequest) =>
   });
 
 export const getResult = () => call<ResultResponse>('/api/result');
+
+export const getLeaderboard = () => call<LeaderboardResponse>('/api/leaderboard');

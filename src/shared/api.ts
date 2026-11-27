@@ -59,3 +59,14 @@ export type ResultResponse = {
   postUrl: string | null;
   subredditName: string;
 };
+
+export type LeaderboardEntry = { username: string; value: number };
+
+export type LeaderboardResponse = {
+  type: 'leaderboard';
+  day: number;
+  /** Today's top 10 by NPC %. */
+  today: LeaderboardEntry[];
+  /** All-time top 10 by best streak. */
+  streaks: LeaderboardEntry[];
+};

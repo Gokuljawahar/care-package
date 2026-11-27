@@ -3,12 +3,15 @@ import { context, redis } from '@devvit/web/server';
 import { cellKey, nextResetAt, toCell } from '../../shared/game';
 import type {
   ErrorResponse,
+  LeaderboardEntry,
+  LeaderboardResponse,
   ResultResponse,
   TapRequest,
   TapResponse,
   TodayResponse,
 } from '../../shared/api';
 import { ensureDay, getDayPrompts, isDayClosed } from '../core/day';
+import { liveStreak, readUser, recordFinish } from '../core/user';
 import { buildReveal, readGrid, readReveals } from '../core/crowd';
 import { keys } from '../core/keys';
 import { scoreDay, topPercent } from '../core/score';
@@ -34,6 +37,8 @@ api.get('/today', async (c) => {
     const reveals = userId
       ? await readReveals(day, prompts.map((p) => p.id), userId)
       : [];
+    const user = userId ? await readUser(userId) : null;
+    const current = await ensureDay();
 
     return c.json<TodayResponse>({
       type: 'today',
@@ -42,8 +47,8 @@ api.get('/today', async (c) => {
       loggedIn: Boolean(userId),
       prompts,
       reveals,
-      streak: 0,
-      bestStreak: 0,
+      streak: user ? liveStreak(user, current) : 0,
+      bestStreak: user?.bestStreak ?? 0,
       nextResetAt: nextResetAt(Date.now()),
       subredditName: context.subredditName,
     });
@@ -101,6 +106,7 @@ api.post('/tap', async (c) => {
     const grid = await readGrid(day, promptId);
     const reveal = buildReveal(promptId, grid, cx, cy);
     const finished = await scoreDay(day, prompts.map((p) => p.id), userId);
+    if (finished) await recordFinish(userId, day);
 
     return c.json<TapResponse>({ type: 'tap', reveal, done: finished !== null });
   } catch (error) {
@@ -124,6 +130,8 @@ api.get('/result', async (c) => {
     const scored = await scoreDay(day, prompts.map((p) => p.id), userId);
     if (!scored) return c.json(fail('Finish all prompts first'), 409);
     const rank = await topPercent(day, userId);
+    const user = await recordFinish(userId, day);
+    const current = await ensureDay();
 
     return c.json<ResultResponse>({
       type: 'result',
@@ -131,8 +139,8 @@ api.get('/result', async (c) => {
       npc: scored.npc,
       label: scored.label,
       reveals: scored.reveals,
-      streak: 0,
-      bestStreak: 0,
+      streak: liveStreak(user, current),
+      bestStreak: user.bestStreak,
       topPercent: rank.topPercent,
       players: rank.players,
       nextResetAt: nextResetAt(Date.now()),
@@ -142,5 +150,32 @@ api.get('/result', async (c) => {
   } catch (error) {
     console.error('GET /api/result failed', error);
     return c.json(fail('Could not load your result'), 500);
+  }
+});
+
+const withUsernames = async (
+  rows: { member: string; score: number }[]
+): Promise<LeaderboardEntry[]> => {
+  if (rows.length === 0) return [];
+  const names = await redis.hMGet(keys.usernames(), rows.map((r) => r.member));
+  return rows.map((r, i) => ({ username: names[i] ?? 'anonymous', value: r.score }));
+};
+
+api.get('/leaderboard', async (c) => {
+  try {
+    const day = await resolveDay();
+    const [todayRows, streakRows] = await Promise.all([
+      redis.zRange(keys.npc(day), 0, 9, { by: 'rank', reverse: true }),
+      redis.zRange(keys.streaks(), 0, 9, { by: 'rank', reverse: true }),
+    ]);
+    return c.json<LeaderboardResponse>({
+      type: 'leaderboard',
+      day,
+      today: await withUsernames(todayRows),
+      streaks: await withUsernames(streakRows),
+    });
+  } catch (error) {
+    console.error('GET /api/leaderboard failed', error);
+    return c.json(fail('Could not load the leaderboard'), 500);
   }
 });
